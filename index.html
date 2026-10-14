@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>HQ</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧭</text></svg>" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Alexandria:wght@400..800&family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Changa:wght@400..800&family=Geist:wght@400..700&family=Inter:opsz,wght@14..32,400..800&family=Readex+Pro:wght@300..700&family=Rubik:wght@400..700&display=swap" />
+    <script>
+      try {
+        var t = localStorage.getItem('hq.theme'); t = t ? JSON.parse(t) : null
+        document.documentElement.dataset.theme = t || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+      } catch (e) { document.documentElement.dataset.theme = 'light' }
+      try {
+        var d = localStorage.getItem('hq.design'); d = d ? JSON.parse(d) : null
+        document.documentElement.dataset.design = d || 'metro'
+      } catch (e) { document.documentElement.dataset.design = 'metro' }
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
