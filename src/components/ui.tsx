@@ -2,6 +2,7 @@ import { useMemo, type ReactNode } from 'react'
 import { resolvePath, toHtml } from '../lib/md'
 import { ago } from '../lib/util'
 import { go } from '../lib/router'
+import { Chart, parseChart, type ChartSpec } from './charts'
 
 export function Card(p: { icon?: ReactNode; title?: ReactNode; extra?: ReactNode; children: ReactNode; className?: string }) {
   return (
@@ -79,7 +80,31 @@ const linkCitations = (md: string) =>
     list.split(/,\s*/).map((p) => `[${p}](/${p})`).join(', '),
   )
 
+const CHART_BLOCK = /```chart[^\n]*\n([\s\S]*?)```/g
+
+/** Markdown with ```chart blocks drawn as interactive charts (bad JSON falls back to the code block). */
 export function Markdown({ md, base = '' }: { md: string; base?: string }) {
+  const parts = useMemo(() => {
+    const out: ({ kind: 'md'; text: string } | { kind: 'chart'; spec: ChartSpec })[] = []
+    let last = 0
+    for (const m of md.matchAll(CHART_BLOCK)) {
+      out.push({ kind: 'md', text: md.slice(last, m.index) })
+      const spec = parseChart(m[1])
+      out.push(spec ? { kind: 'chart', spec } : { kind: 'md', text: m[0] })
+      last = (m.index || 0) + m[0].length
+    }
+    out.push({ kind: 'md', text: md.slice(last) })
+    return out.filter((p) => p.kind === 'chart' || p.text.trim())
+  }, [md])
+  if (parts.length <= 1 && parts[0]?.kind !== 'chart') return <MarkdownText md={md} base={base} />
+  return (
+    <div className="md-rich">
+      {parts.map((p, i) => (p.kind === 'chart' ? <Chart key={i} spec={p.spec} /> : <MarkdownText key={i} md={p.text} base={base} />))}
+    </div>
+  )
+}
+
+function MarkdownText({ md, base = '' }: { md: string; base?: string }) {
   const html = useMemo(() => toHtml(linkCitations(md)), [md])
   const onClick = (e: React.MouseEvent) => {
     const a = (e.target as HTMLElement).closest('a')

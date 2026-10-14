@@ -4,6 +4,7 @@ import {
   History, ListChecks, Minus, Sparkles, TrendingUp,
 } from 'lucide-react'
 import { useHQ } from '../App'
+import { Chart } from '../components/charts'
 import { Ago, Avatar, Badge, Card, Empty, toneOf } from '../components/ui'
 import { askClaudeToRefresh, displayName, freshness, metrics, milestones, projectSlug } from '../lib/hq'
 import type { Doc } from '../lib/md'
@@ -194,6 +195,21 @@ function ProjectView({ p }: { p: Doc }) {
             })}
           </div>
           {snaps.length < 2 && <p className="muted small">Change vs. last time shows up after the next snapshot. "Ask Claude to refresh" adds one.</p>}
+          {snaps.length >= 2 && (
+            <div className="trend-grid">
+              {keys.map((k) => (
+                <Chart
+                  key={k}
+                  spec={{
+                    type: 'line',
+                    title: labels[k] || k,
+                    labels: snaps.map((s) => shortDate(s.date)),
+                    series: [{ name: labels[k] || k, data: snaps.map((s) => (typeof s.values[k] === 'number' ? (s.values[k] as number) : null)) }],
+                  }}
+                />
+              ))}
+            </div>
+          )}
           <div className="table-wrap">
             <table className="cmp">
               <thead>

@@ -1,16 +1,19 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import { Brain, Cloud, Database, FolderOpen, Globe, History, Link2, LoaderCircle, Lock, Monitor, Plug, ReceiptText, Reply, Send, Sparkles, TriangleAlert, Zap } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import {
+  ArrowUp, Brain, ChartColumn, Cloud, Database, FolderOpen, Globe, History, Link2, ListChecks, LoaderCircle, Lock, MessageSquarePlus,
+  Monitor, Sparkles, Target, TrendingUp, TriangleAlert, Zap,
+} from 'lucide-react'
 import { useHQ } from '../App'
-import { Ago, Badge, Card, Empty, Markdown, Segmented } from '../components/ui'
+import { Ago, Badge, Markdown, Segmented } from '../components/ui'
 import { askAi, displayName, projectSlug, requestId, type AskOptions, type Connector } from '../lib/hq'
 import { askViaEdge, edgeAvailable } from '../lib/edge'
 import type { Doc } from '../lib/md'
-import { ago, makeId, store } from '../lib/util'
+import { ago, firstName, makeId, store } from '../lib/util'
 
 const CONNECTORS: [Connector, ReactNode, string, string][] = [
-  ['web', <Globe className="i sm" />, 'Web search', 'Google Search with cited sources'],
-  ['links', <Link2 className="i sm" />, 'Read links', 'Reads any URL you paste'],
-  ['history', <History className="i sm" />, 'File history', 'What changed, when, by whom (git)'],
+  ['web', <Globe className="i sm" />, 'Web', 'Google Search with cited sources'],
+  ['links', <Link2 className="i sm" />, 'Links', 'Reads any URL you paste'],
+  ['history', <History className="i sm" />, 'History', 'What changed, when, by whom (git)'],
   ['supabase', <Database className="i sm" />, 'Supabase', 'Reads your Supabase tables (read-only)'],
 ]
 const TOOL_ICON: [RegExp, ReactNode][] = [
@@ -20,28 +23,31 @@ const TOOL_ICON: [RegExp, ReactNode][] = [
   [/supabase/i, <Database className="i" />],
   [/read |listed files|searched workspace/, <FolderOpen className="i" />],
 ]
-const QUICK = ['What should I do next? Top 3 only.', 'Compare the money options in one table.', 'Where does my LinkedIn stand?', 'What is waiting on me right now?']
+const SUGGESTIONS: [ReactNode, string][] = [
+  [<Target className="i" />, 'What should I do next? Top 3 only.'],
+  [<TrendingUp className="i" />, 'Chart my LinkedIn numbers.'],
+  [<ChartColumn className="i" />, 'Compare the 5 money options visually.'],
+  [<ListChecks className="i" />, 'How far along is each project? Show progress.'],
+]
 type Mode = 'fast' | 'deep'
+type Pending = { thread: string; question: string } | null
 
 export default function Ask() {
   const { model, me, source, reload } = useHQ()
+  const [active, setActiveState] = useState<string>(() => store.get('hq.chat', 'new'))
   const [q, setQ] = useState('')
   const [connectors, setConnectors] = useState<Connector[]>(store.get('hq.connectors', ['web', 'links']))
   const [mode, setModeState] = useState<Mode>(store.get('hq.aimode', 'fast'))
   const [project, setProject] = useState<string | undefined>()
-  const [busy, setBusy] = useState<string | false>(false)
+  const [pending, setPending] = useState<Pending>(null)
   const [venue, setVenue] = useState<'local' | 'edge' | 'actions'>(source.kind === 'local' ? 'local' : 'actions')
+  const scroller = useRef<HTMLDivElement>(null)
+  const input = useRef<HTMLTextAreaElement>(null)
 
-  useEffect(() => {
-    const p = store.get<{ q: string; project?: string } | null>('hq.askPrefill', null)
-    if (p) {
-      setQ(p.q || '')
-      setProject(p.project)
-      store.del('hq.askPrefill')
-    }
-    edgeAvailable(source).then((ok) => ok && setVenue('edge'))
-  }, [source])
-
+  const setActive = (id: string) => {
+    store.set('hq.chat', id)
+    setActiveState(id)
+  }
   const setMode = (m: Mode) => {
     store.set('hq.aimode', m)
     setModeState(m)
@@ -52,7 +58,19 @@ export default function Ask() {
     setConnectors(next)
   }
 
-  // Conversations: a root question + its follow-ups (same `thread`).
+  useEffect(() => {
+    const p = store.get<{ q: string; project?: string } | null>('hq.askPrefill', null)
+    if (p) {
+      setActive('new')
+      setQ(p.q || '')
+      setProject(p.project)
+      store.del('hq.askPrefill')
+      setTimeout(() => input.current?.focus(), 50)
+    }
+    edgeAvailable(source).then((ok) => ok && setVenue('edge'))
+  }, [source])
+
+  // Conversations: the first question + its follow-ups (same `thread`), newest activity first.
   const threads = useMemo(() => {
     const groups = new Map<string, Doc[]>()
     for (const r of [...model.requests].reverse()) {
@@ -62,14 +80,22 @@ export default function Ask() {
     const last = (rs: Doc[]) => String(rs[rs.length - 1].data.created || '')
     return [...groups.entries()].sort((a, b) => last(b[1]).localeCompare(last(a[1])))
   }, [model])
+  const turns = active === 'new' ? [] : threads.find(([root]) => root === active)?.[1] || []
+  const showPending = pending && pending.thread === active
 
-  const pending = model.requests.filter((r) => !model.answers.has(requestId(r)))
-  const pendingKey = pending.map(requestId).join(',')
-  // On GitHub without the edge function, an Action writes the answer: check every 10 s.
+  // Keep the newest message in view.
   useEffect(() => {
-    if (source.kind !== 'github' || !pending.length) return
+    const el = scroller.current
+    if (el) el.scrollTop = el.scrollHeight
+  }, [active, turns.length, showPending, model])
+
+  // GitHub Actions venue: poll until the answer file appears.
+  const waiting = model.requests.filter((r) => !model.answers.has(requestId(r)))
+  const waitingKey = waiting.map(requestId).join(',')
+  useEffect(() => {
+    if (source.kind !== 'github' || !waiting.length) return
     const t = setInterval(async () => {
-      for (const r of pending) {
+      for (const r of waiting) {
         if (await source.read(`ai/answers/${requestId(r)}.md`).catch(() => null)) {
           await reload()
           break
@@ -77,157 +103,207 @@ export default function Ask() {
       }
     }, 10000)
     return () => clearInterval(t)
-  }, [source, pendingKey])
+  }, [source, waitingKey])
 
-  const send = async (text: string, thread?: string) => {
-    if (!text.trim()) return
-    setBusy(thread || 'new')
-    const opts: AskOptions = { question: text.trim(), kind: 'ask', thread, connectors, model: mode, project: thread ? undefined : project }
+  const send = async (text = q) => {
+    const question = text.trim()
+    if (!question || pending) return
+    const id = makeId(me.login)
+    const thread = active === 'new' ? undefined : active
+    const opts: AskOptions & { id: string } = { id, question, kind: 'ask', thread, connectors, model: mode, project: thread ? undefined : project }
+    setQ('')
+    if (!thread) setActive(id)
+    setPending({ thread: thread || id, question })
     try {
-      if (venue === 'edge') {
-        await askViaEdge(source, { ...opts, id: makeId(me.login) })
-        await reload()
-      } else {
-        const id = await askAi(source, me, opts)
-        await reload()
-        if (source.runAi) {
-          await source.runAi(id)
-          await reload()
-        }
+      if (venue === 'edge') await askViaEdge(source, opts)
+      else {
+        await askAi(source, me, opts)
+        if (source.runAi) await source.runAi(id)
       }
-      if (!thread) {
-        setQ('')
-        setProject(undefined)
-      }
+      await reload()
+      setProject(undefined)
     } catch (e: any) {
       alert(e?.message || e)
+      setQ(question)
     } finally {
-      setBusy(false)
+      setPending(null)
     }
   }
 
   const projectTitle = (slug?: unknown) => String(model.projects.find((p) => projectSlug(p) === slug)?.data.title || slug || '')
+  const titleOf = (rs: Doc[]) => rs[0].body.trim().split('\n')[0].slice(0, 70) || 'Untitled'
 
   return (
-    <>
-      <Card className="composer">
-        {project && (
-          <div className="row">
-            <a className="proj-chip" href={'#/projects/' + project}>{projectTitle(project)}</a>
-            <button className="btn ghost sm" onClick={() => setProject(undefined)}>remove</button>
-          </div>
-        )}
-        <textarea
-          rows={2}
-          placeholder="Ask anything: your workspace, the web, a link… (Ctrl+Enter)"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && (e.ctrlKey || e.metaKey) && send(q)}
-        />
-        <div className="connectors" aria-label="Connectors">
-          <span className="chip on locked" title="Always on: your .md files"><Lock className="i sm" /> Workspace</span>
-          {CONNECTORS.map(([id, icon, label, hint]) => (
-            <button key={id} className={'chip' + (connectors.includes(id) ? ' on' : ' off')} onClick={() => toggle(id)} title={hint} aria-pressed={connectors.includes(id)}>
-              {icon} {label}
-            </button>
-          ))}
-        </div>
-        <div className="row between wrap">
-          <Segmented<Mode>
-            value={mode}
-            onChange={setMode}
-            options={[['fast', <><Zap className="i sm" /> Fast</>], ['deep', <><Brain className="i sm" /> Deep</>]]}
-          />
-          <button className="btn primary" disabled={!!busy || !q.trim()} onClick={() => send(q)}>
-            {busy === 'new' ? <><LoaderCircle className="i sm spin" /> Thinking…</> : <><Sparkles className="i sm" /> Ask</>}
+    <div className="chat">
+      <aside className="chat-list">
+        <div className="chat-list-h">
+          <button className="btn primary block" onClick={() => { setActive('new'); setTimeout(() => input.current?.focus(), 30) }}>
+            <MessageSquarePlus className="i sm" /> New chat
           </button>
         </div>
-        <div className="chips">
-          {QUICK.map((x) => (
-            <button key={x} className="chip" disabled={!!busy} onClick={() => send(x)}>{x}</button>
+        <div className="chat-items">
+          {threads.map(([root, rs]) => (
+            <button key={root} className={'chat-item' + (root === active ? ' on' : '')} onClick={() => setActive(root)}>
+              <span className="t">{titleOf(rs)}</span>
+              <span className="s">
+                {ago(rs[rs.length - 1].data.created)} · {rs.length} {rs.length === 1 ? 'message' : 'messages'}
+              </span>
+            </button>
           ))}
+          {!threads.length && <div className="muted small pad">No chats yet.</div>}
         </div>
-        <div className="muted small meta-line">
-          {venue === 'actions' ? <Cloud className="i sm" /> : <Monitor className="i sm" />}
-          {venue === 'local' && 'Answers right here (local mode).'}
-          {venue === 'edge' && 'Instant answers via Supabase.'}
-          {venue === 'actions' && 'Answered by a GitHub Action, about a minute. You can leave the page.'}
-          <span className="spacer" />
-          <Plug className="i sm" /> More (Notion, Gmail, Drive): need API keys
-        </div>
-      </Card>
+      </aside>
 
-      {threads.length ? (
-        threads.map(([root, turns]) => (
-          <article key={root} className="qa thread">
-            {turns.map((r, i) => (
-              <Turn key={r.path} r={r} follow={i > 0} projectTitle={projectTitle} />
-            ))}
-            <FollowUp busy={busy === root} onSend={(t) => send(t, root)} />
-          </article>
-        ))
-      ) : (
-        <Empty icon={<Sparkles className="i" />} text="No questions yet. Try a quick one above." />
-      )}
-    </>
+      <section className="chat-main">
+        <div className="chat-mobile-bar">
+          <select value={active} onChange={(e) => setActive(e.target.value)} aria-label="Conversation">
+            <option value="new">New chat</option>
+            {threads.map(([root, rs]) => <option key={root} value={root}>{titleOf(rs)}</option>)}
+          </select>
+          <button className="btn sm" onClick={() => setActive('new')}><MessageSquarePlus className="i sm" /></button>
+        </div>
+
+        <div className="chat-scroll" ref={scroller}>
+          {!turns.length && !showPending ? (
+            <div className="chat-empty">
+              <div className="chat-empty-ico"><Sparkles className="i lg" /></div>
+              <h2>Hi {firstName(me.name)}, what do you want to know?</h2>
+              <p className="muted">I read your whole workspace, and can search the web, read links and draw charts.</p>
+              <div className="suggest">
+                {SUGGESTIONS.map(([icon, text]) => (
+                  <button key={text} onClick={() => send(text)} disabled={!!pending}>
+                    {icon}
+                    <span>{text}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <>
+              {turns.map((r) => <Turn key={r.path} r={r} projectTitle={projectTitle} />)}
+              {showPending && (
+                <>
+                  <UserBubble text={pending!.question} />
+                  <div className="msg-row">
+                    <div className="ai-avatar"><Sparkles className="i sm" /></div>
+                    <div className="ai-msg"><Typing /></div>
+                  </div>
+                </>
+              )}
+            </>
+          )}
+        </div>
+
+        <div className="chat-composer">
+          <div className="composer-box">
+            {project && (
+              <div className="row">
+                <a className="proj-chip" href={'#/projects/' + project}>{projectTitle(project)}</a>
+                <button className="btn ghost sm" onClick={() => setProject(undefined)}>remove</button>
+              </div>
+            )}
+            <textarea
+              ref={input}
+              rows={1}
+              placeholder={active === 'new' ? 'Ask anything… (Enter to send, Shift+Enter for a new line)' : 'Reply…'}
+              value={q}
+              onChange={(e) => {
+                setQ(e.target.value)
+                e.target.style.height = 'auto'
+                e.target.style.height = Math.min(200, e.target.scrollHeight) + 'px'
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault()
+                  send()
+                }
+              }}
+            />
+            <div className="composer-row">
+              <span className="chip sm on locked" title="Always on: your .md files"><Lock className="i sm" /> Workspace</span>
+              {CONNECTORS.map(([id, icon, label, hint]) => (
+                <button key={id} className={'chip sm' + (connectors.includes(id) ? ' on' : ' off')} onClick={() => toggle(id)} title={hint} aria-pressed={connectors.includes(id)}>
+                  {icon} {label}
+                </button>
+              ))}
+              <span className="spacer" />
+              <Segmented<Mode> value={mode} onChange={setMode} options={[['fast', <><Zap className="i sm" /> Fast</>], ['deep', <><Brain className="i sm" /> Deep</>]]} />
+              <button className="send" onClick={() => send()} disabled={!!pending || !q.trim()} aria-label="Send">
+                {pending ? <LoaderCircle className="i spin" /> : <ArrowUp className="i" />}
+              </button>
+            </div>
+          </div>
+          <div className="composer-note muted small">
+            {venue === 'actions' ? <Cloud className="i sm" /> : <Monitor className="i sm" />}
+            {venue === 'local' && 'Answers on this PC.'}
+            {venue === 'edge' && 'Instant answers via Supabase.'}
+            {venue === 'actions' && 'Answered by GitHub Actions (about a minute).'}
+          </div>
+        </div>
+      </section>
+    </div>
   )
 }
 
-function Turn({ r, follow, projectTitle }: { r: Doc; follow: boolean; projectTitle: (s?: unknown) => string }) {
-  const { model } = useHQ()
+function UserBubble({ text }: { text: string }) {
+  return (
+    <div className="msg-row user">
+      <div className="bubble user">{text}</div>
+    </div>
+  )
+}
+
+function Typing() {
+  return (
+    <span className="typing" aria-label="Thinking">
+      <i /> <i /> <i />
+    </span>
+  )
+}
+
+function Turn({ r, projectTitle }: { r: Doc; projectTitle: (s?: unknown) => string }) {
+  const { model, me } = useHQ()
   const a = model.answers.get(requestId(r))
   const tools: string[] = Array.isArray(a?.data.tools) ? a!.data.tools.map(String) : []
   const deep = /argon/.test(String(a?.data.model || '')) || r.data.model === 'deep'
+  const mine = String(r.data.author || '').toLowerCase() === me.login.toLowerCase()
   return (
     <>
-      <div className={'q' + (follow ? ' follow' : '')}>
-        <div className="row wrap">
-          {follow && <Reply className="i sm" />}
-          <b>{displayName(model, r.data.author)}</b>
-          <Ago iso={r.data.created} />
-          {r.data.kind === 'summarize' && <Badge tone="info"><ReceiptText className="i" /> summary</Badge>}
-          {r.data.project && <a className="proj-chip" href={'#/projects/' + r.data.project}>{projectTitle(r.data.project)}</a>}
-          {r.data.target && <a className="small" href={'#/docs/' + r.data.target}>{String(r.data.target)}</a>}
-        </div>
-        <div className="q-text">{r.body.trim()}</div>
-      </div>
-      <div className="a">
-        {a ? (
-          <>
-            <div className="answer-meta">
-              {a.data.status === 'error' ? (
-                <Badge tone="bad"><TriangleAlert className="i" /> error</Badge>
-              ) : (
-                <Badge tone={deep ? 'accent' : 'info'}>{deep ? <Brain className="i" /> : <Zap className="i" />} {deep ? 'Deep' : 'Fast'}</Badge>
-              )}
-              {tools.slice(0, 5).map((t) => (
-                <Badge key={t} tone="muted">{TOOL_ICON.find(([re]) => re.test(t))?.[1]} {t}</Badge>
-              ))}
-              {a.data.seconds !== undefined && <span className="muted small num">{String(a.data.seconds)}s</span>}
+      <div className="msg-row user">
+        <div className="user-col">
+          {(!mine || r.data.project) && (
+            <div className="user-meta small muted">
+              {!mine && displayName(model, r.data.author)}
+              {r.data.project && <a className="proj-chip" href={'#/projects/' + r.data.project}>{projectTitle(r.data.project)}</a>}
             </div>
-            <Markdown md={a.body} base={a.path} />
-          </>
-        ) : (
-          <div className="pending"><LoaderCircle className="i spin" /> Thinking… asked {ago(r.data.created)}</div>
-        )}
+          )}
+          <div className="bubble user">{r.body.trim()}</div>
+        </div>
+      </div>
+      <div className="msg-row">
+        <div className="ai-avatar"><Sparkles className="i sm" /></div>
+        <div className="ai-msg">
+          {a ? (
+            <>
+              <div className="answer-meta">
+                {a.data.status === 'error' ? (
+                  <Badge tone="bad"><TriangleAlert className="i" /> error</Badge>
+                ) : (
+                  <Badge tone={deep ? 'accent' : 'info'}>{deep ? <Brain className="i" /> : <Zap className="i" />} {deep ? 'Deep' : 'Fast'}</Badge>
+                )}
+                {tools.slice(0, 4).map((t) => (
+                  <Badge key={t} tone="muted">{TOOL_ICON.find(([re]) => re.test(t))?.[1]} {t}</Badge>
+                ))}
+                {a.data.seconds !== undefined && <span className="muted small num">{String(a.data.seconds)}s</span>}
+                <Ago iso={a.data.created} />
+              </div>
+              <Markdown md={a.body} base={a.path} />
+            </>
+          ) : (
+            <Typing />
+          )}
+        </div>
       </div>
     </>
-  )
-}
-
-function FollowUp({ busy, onSend }: { busy: boolean; onSend: (t: string) => void }) {
-  const [t, setT] = useState('')
-  const go = () => {
-    if (!t.trim()) return
-    onSend(t)
-    setT('')
-  }
-  return (
-    <div className="followup">
-      <input className="grow" placeholder="Ask a follow-up…" value={t} onChange={(e) => setT(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && go()} disabled={busy} />
-      <button className="btn sm" disabled={busy || !t.trim()} onClick={go}>
-        {busy ? <LoaderCircle className="i sm spin" /> : <Send className="i sm" />} Reply
-      </button>
-    </div>
   )
 }

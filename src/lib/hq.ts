@@ -140,6 +140,8 @@ export async function saveProfile(src: Source, me: Me, data: Record<string, unkn
 
 export type Connector = 'web' | 'links' | 'history' | 'supabase'
 export type AskOptions = {
+  /** optional: pick the id up front (the chat needs it to open the new conversation) */
+  id?: string
   question: string
   kind: 'ask' | 'summarize'
   target?: string
@@ -151,7 +153,7 @@ export type AskOptions = {
 }
 
 export async function askAi(src: Source, me: Me, q: AskOptions) {
-  const id = makeId(me.login)
+  const id = q.id || makeId(me.login)
   const data = {
     id, author: me.login, created: nowIso(), kind: q.kind, target: q.target, thread: q.thread,
     connectors: q.connectors?.length ? q.connectors : undefined, model: q.model, project: q.project,
