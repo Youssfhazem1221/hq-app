@@ -73,6 +73,13 @@ export default function Settings({ source, onConnect, theme, toggleTheme }: Prop
           <li><b>Permissions:</b> Contents → <b>Read and write</b></li>
           <li>Generate → paste it below</li>
         </ol>
+        <div className="callout tone-warn">
+          <Lock className="i" />
+          <span>
+            <b>Invited to someone else's repo?</b> Fine-grained tokens can't reach it. Use a{' '}
+            <a href="https://github.com/settings/tokens/new" target="_blank" rel="noopener">classic token</a> with the <code>repo</code> box ticked and an expiry date.
+          </span>
+        </div>
         <div className="form">
           <label>Repo (owner/name)<input value={repo} onChange={(e) => setRepo(e.target.value)} /></label>
           <label>Branch<input value={branch} onChange={(e) => setBranch(e.target.value)} /></label>
