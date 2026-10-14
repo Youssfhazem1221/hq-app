@@ -110,7 +110,7 @@ export default function App() {
 
   const model = useMemo(() => (files ? buildModel(files) : null), [files])
   const section = '/' + (route.split('/')[1] || '')
-  const [, NavIcon, navLabel] = NAV.find(([r]) => r === section) || NAV[0]
+  const [, NavIcon, navLabel] = source === null ? NAV.find(([r]) => r === '/settings')! : NAV.find(([r]) => r === section) || NAV[0]
 
   const counts: Record<string, number> = {}
   if (model && me) {
