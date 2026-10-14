@@ -36,7 +36,7 @@ export const DESIGNS: Direction[] = [
   {
     id: 'obsidian',
     name: 'Apple × Obsidian',
-    tag: 'You asked (mix)',
+    tag: 'Default',
     world: "Obsidian's vault + Apple's polish",
     thesis: 'Graphite vault, file-tree sidebar, the page title as an open tab, purple internal links, with Apple frosting and rounded panes.',
     palette: ['#1e1e1e', '#252525', '#161616', '#8b6cef', '#a88bfa', '#dcddde'],
@@ -122,5 +122,5 @@ export const DESIGNS: Direction[] = [
   },
 ]
 
-export const DEFAULT_DESIGN: DesignId = 'metro'
+export const DEFAULT_DESIGN: DesignId = 'obsidian'
 export const isDesign = (v: unknown): v is DesignId => DESIGNS.some((d) => d.id === v)
