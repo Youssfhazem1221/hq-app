@@ -751,3 +751,70 @@ export function choiceLabel(options: unknown, pick: number | 'both' | string): s
   if (typeof pick === 'number') return pick >= 0 && pick < list.length ? nameAt(pick) : ''
   return cleanLine(pick, 120)
 }
+
+/**
+ * Untick one milestone (the index-th item of the `milestones:` block list): `done: true` → `done: false` and its `date:`
+ * line is removed. Only that item's lines change; CRLF kept. Not done / not found → unchanged.
+ */
+export function untickMilestone(text: string, index: number): string {
+  const src = str(text)
+  const lines: string[] = [...(src.match(/[^\n]*\n|[^\n]+$/g) || [])]
+  const content = (l: string) => l.replace(/\r?\n$/, '')
+  if (!lines.length || !/^---[ \t]*$/.test(stripBom(content(lines[0])))) return src
+  let close = -1
+  for (let i = 1; i < lines.length; i++) if (/^---[ \t]*$/.test(content(lines[i]))) { close = i; break }
+  const start = lines.findIndex((l, i) => i > 0 && i < close && /^milestones[ \t]*:[ \t]*(#.*)?$/.test(content(l)))
+  if (close < 0 || start < 0) return src
+  let end = start + 1
+  while (end < close && (content(lines[end]).trim() === '' || /^[ \t]+|^-( |$)/.test(content(lines[end])))) end++
+  const heads: number[] = []
+  let dashCol = -1
+  for (let i = start + 1; i < end; i++) {
+    const mm = content(lines[i]).match(/^([ \t]*)-( |$)/)
+    if (!mm) continue
+    if (dashCol < 0) dashCol = mm[1].length
+    if (mm[1].length === dashCol) heads.push(i)
+  }
+  const from = heads[index]
+  if (from === undefined) return src
+  const to = heads[index + 1] ?? end
+  const out = lines.slice()
+  let changed = false
+  for (let i = to - 1; i >= from; i--) {
+    const c = content(out[i])
+    const body = i === from ? c.slice(dashCol + 2) : c.trimStart()
+    if (/^done[ \t]*:[ \t]*(true|yes|y|x|done)\b/i.test(body)) {
+      out[i] = out[i].replace(/(done[ \t]*:[ \t]*)(true|yes|y|x|done)\b/i, '$1false')
+      changed = true
+    } else if (i !== from && /^date[ \t]*:/.test(body)) {
+      out.splice(i, 1)
+    }
+  }
+  return changed ? out.join('') : src
+}
+
+/** Append one milestone `{text, done: false}` to the `milestones:` block list (creates the block when missing). */
+export function appendMilestone(text: string, milestone: string): string {
+  const src = str(text)
+  const t = cleanLine(milestone, 140)
+  if (!t) return src
+  const eol = src.includes('\r\n') ? '\r\n' : '\n'
+  const lines: string[] = [...(src.match(/[^\n]*\n|[^\n]+$/g) || [])]
+  const content = (l: string) => l.replace(/\r?\n$/, '')
+  if (!lines.length || !/^---[ \t]*$/.test(stripBom(content(lines[0])))) return src
+  let close = -1
+  for (let i = 1; i < lines.length; i++) if (/^---[ \t]*$/.test(content(lines[i]))) { close = i; break }
+  if (close < 0) return src
+  const start = lines.findIndex((l, i) => i > 0 && i < close && /^milestones[ \t]*:[ \t]*(\[\s*\])?[ \t]*(#.*)?$/.test(content(l)))
+  if (start < 0) {
+    const add = [`milestones:${eol}`, `  - text: ${yamlValue(t)}${eol}`, `    done: false${eol}`]
+    return [...lines.slice(0, close), ...add, ...lines.slice(close)].join('')
+  }
+  let end = start + 1
+  while (end < close && (content(lines[end]).trim() === '' || /^[ \t]+|^-( |$)/.test(content(lines[end])))) end++
+  while (end > start + 1 && content(lines[end - 1]).trim() === '') end--
+  const dash = (lines.slice(start + 1, end).map((l) => content(l).match(/^([ \t]*)-( |$)/)).find(Boolean) || [null, '  '])[1] as string
+  const add = [`${dash}- text: ${yamlValue(t)}${eol}`, `${dash}  done: false${eol}`]
+  const head = /\[\s*\]/.test(content(lines[start])) ? [...lines.slice(0, start), `milestones:${eol}`] : lines.slice(0, end)
+  return [...head, ...add, ...lines.slice(end)].join('')
+}

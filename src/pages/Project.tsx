@@ -11,7 +11,7 @@ import { title as docTitle, type Doc } from '../lib/md'
 import { setTopKeys } from '../lib/people-core'
 import { addFirstMilestone } from '../lib/people'
 import type { Commit } from '../lib/source'
-import { decisionDoc, isDecision, isOpenTodo, projectOfTodo, type NextModel } from '../lib/next-core'
+import { appendMilestone, decisionDoc, isDecision, isOpenTodo, projectOfTodo, tickMilestone, untickMilestone, type NextModel } from '../lib/next-core'
 import { parseExplainer } from '../components/explainers/parse'
 import { BLOCKS, newBlockCtx, splitBlocks } from '../components/blocks'
 import { PageHeader } from '../components/shell/PageHeader'
@@ -66,14 +66,54 @@ function ProjectView({ p, slug, next }: { p: Doc; slug: string; next: ReturnType
     (w) => !(prefs.project_hidden || []).includes(w),
   )
 
-  // owner, no milestones yet: the journey's one field adds the first one (and clears the template's placeholder next:)
-  const addMilestone = async (text: string) => {
+  // owner: edit the milestones in place (tick / untick / add), each with Undo
+  const editMilestones = async (fn: (cur: string) => string, message: string, done: string) => {
+    let before: string | null = null
+    let after: string | null = null
     try {
-      if (await addFirstMilestone(source, me, p.path, text)) toast('Milestone added', 'ok')
+      const ok = await source.update(p.path, (cur) => {
+        before = cur
+        after = null
+        if (cur === null) return null
+        const next = fn(cur)
+        if (next === cur) return null
+        after = next
+        return next
+      }, message)
+      if (!ok || after === null) return
       await reload()
+      toast(done, 'ok', {
+        undo: () => {
+          source
+            .update(p.path, (cur) => (cur !== null && cur === after && before !== null ? before : cur), 'project: undo milestone change')
+            .then(() => reload())
+            .catch((e) => toast(String(e?.message || e), 'error'))
+        },
+      })
     } catch (e: any) {
       toast(String(e?.message || e), 'error')
     }
+  }
+  const msText = (i: number) => String(((p.data.milestones as any[]) || [])[i]?.text || '').slice(0, 40)
+  const toggleMilestone = (index: number, done: boolean) =>
+    editMilestones(
+      (cur) => (done ? tickMilestone(cur, index, new Date().toISOString().slice(0, 10)) : untickMilestone(cur, index)),
+      `project: milestone ${done ? 'done' : 'reopened'} · ${msText(index)}`,
+      done ? `Done: ${msText(index)} 🎉` : `Reopened: ${msText(index)}`,
+    )
+  // no milestones yet: the first one also clears the template's placeholder next:
+  const addMilestone = async (text: string) => {
+    const has = Array.isArray(p.data.milestones) && p.data.milestones.length > 0
+    if (!has) {
+      try {
+        if (await addFirstMilestone(source, me, p.path, text)) toast('Milestone added', 'ok')
+        await reload()
+      } catch (e: any) {
+        toast(String(e?.message || e), 'error')
+      }
+      return
+    }
+    await editMilestones((cur) => appendMilestone(cur, text), `project: milestone added · ${text.slice(0, 40)}`, 'Milestone added')
   }
 
   // owner: mark the whole project done (or reopen it), with Undo
@@ -106,7 +146,14 @@ function ProjectView({ p, slug, next }: { p: Doc; slug: string; next: ReturnType
   }
 
   const blocks: Record<ProjectWidget, ReactNode> = {
-    journey: <Journey project={p} next={next} onAddMilestone={same(p.data.owner, me.login) ? addMilestone : undefined} />,
+    journey: (
+      <Journey
+        project={p}
+        next={next}
+        onAddMilestone={same(p.data.owner, me.login) ? addMilestone : undefined}
+        onToggleMilestone={same(p.data.owner, me.login) ? toggleMilestone : undefined}
+      />
+    ),
     explainers: <ProjectPicture p={p} slug={slug} />,
     team: null, // drawn with files (one row)
     files: null,

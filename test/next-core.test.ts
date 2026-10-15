@@ -415,3 +415,16 @@ test('(C1-2 real) tickMilestone on a copy of the decision\'s project file: only 
   const crlf = before.replace(/\r?\n/g, '\r\n')
   assert.equal(N.tickMilestone(crlf, ms.text, '2026-10-15'), after.replace(/\r?\n/g, '\r\n'))
 })
+
+test('untickMilestone + appendMilestone: only the touched lines change', () => {
+  const base = ['---', 'title: P', 'milestones:', '  - text: "A"', '    date: 2026-10-01', '    done: true', '  - text: "B"', '    done: false', 'status: active', '---', '', 'body', ''].join('\n')
+  const un = N.untickMilestone(base, 0)
+  assert.equal(un, base.replace('    date: 2026-10-01\n    done: true', '    done: false'))
+  assert.equal(N.untickMilestone(base, 1), base, 'already open → unchanged')
+  const add = N.appendMilestone(base, 'C: ship it')
+  assert.equal(add, base.replace('    done: false\nstatus', '    done: false\n  - text: "C: ship it"\n    done: false\nstatus'))
+  const none = ['---', 'title: P', 'milestones: []', '---', ''].join('\n')
+  assert.match(N.appendMilestone(none, 'First'), /milestones:\n  - text: First\n    done: false\n---/)
+  // tick then untick round-trips
+  assert.equal(N.untickMilestone(N.tickMilestone(base, 1, '2026-10-16'), 1), base)
+})

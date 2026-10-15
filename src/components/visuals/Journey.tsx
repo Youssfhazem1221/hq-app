@@ -21,12 +21,14 @@ type Props = {
   numbersId?: string
   /** Owner only: a project with no milestones shows one "Add the first milestone" field (its one action). */
   onAddMilestone?: (text: string) => Promise<unknown>
+  /** Owner: tick / untick a milestone (its index in `milestones`). */
+  onToggleMilestone?: (index: number, done: boolean) => Promise<unknown>
   className?: string
 }
 
 const sameLogin = (a: unknown, b: unknown) => String(a ?? '').toLowerCase() === String(b ?? '').toLowerCase()
 
-export function Journey({ project, next, onAct, numbersId = 'numbers', onAddMilestone, className }: Props) {
+export function Journey({ project, next, onAct, numbersId = 'numbers', onAddMilestone, onToggleMilestone, className }: Props) {
   const m = useMemo(() => journeyModel<NextItem>(project, next ?? null), [project, next])
   const hq = useHQMaybe()
   const [cur, setCur] = useState(m.focusK)
@@ -61,6 +63,7 @@ export function Journey({ project, next, onAct, numbersId = 'numbers', onAddMile
   // milestone, which replaces the template's placeholder Next; others see one quiet line.
   const empty = m.total === 0
   const addFirst = empty && !!onAddMilestone && (!m.next || m.next.kind === 'milestone')
+  const nowMs = m.milestones.find((x) => x.state === 'next')
 
   return (
     <section className={'journey pc' + m.color + (empty ? ' j-none' : '') + (className ? ' ' + className : '')} aria-label="Journey">
@@ -144,6 +147,18 @@ export function Journey({ project, next, onAct, numbersId = 'numbers', onAddMile
         <p className="j-empty sm muted">No milestones yet.</p>
       ) : null}
 
+      {!empty && (onToggleMilestone || onAddMilestone) && (
+        <div className="j-acts">
+          {onToggleMilestone && nowMs && (
+            <button className="btn sm" type="button" onClick={() => void onToggleMilestone(nowMs.index, true)}>
+              <Icon name="ok" size="s" />
+              Mark done: {nowMs.text.length > 40 ? nowMs.text.slice(0, 39) + '…' : nowMs.text}
+            </button>
+          )}
+          {onAddMilestone && <AddFirstMilestone onAdd={onAddMilestone} compact />}
+        </div>
+      )}
+
       {m.goal && !m.goalReached && (
         <p className="j-goal">
           <Icon name="win" size="s" />
@@ -156,7 +171,20 @@ export function Journey({ project, next, onAct, numbersId = 'numbers', onAddMile
           <ol className="tl">
             {m.milestones.map((ms) => (
               <li key={ms.index} className={ms.state === 'done' ? 'done' : ms.state === 'next' ? 'next' : ''}>
-                <span className="nd" aria-hidden="true">{ms.state === 'done' && <Icon name="check" size="s" />}</span>
+                {onToggleMilestone ? (
+                  <button
+                    type="button"
+                    className="nd ck"
+                    role="checkbox"
+                    aria-checked={ms.state === 'done'}
+                    aria-label={(ms.state === 'done' ? 'Reopen: ' : 'Mark done: ') + ms.text}
+                    onClick={() => void onToggleMilestone(ms.index, ms.state !== 'done')}
+                  >
+                    {ms.state === 'done' && <Icon name="check" size="s" />}
+                  </button>
+                ) : (
+                  <span className="nd" aria-hidden="true">{ms.state === 'done' && <Icon name="check" size="s" />}</span>
+                )}
                 <span className="tx">
                   {ms.text}
                   {ms.state !== 'later' && <span className="sr"> ({ms.state === 'done' ? 'done' : 'now'})</span>}
@@ -172,7 +200,7 @@ export function Journey({ project, next, onAct, numbersId = 'numbers', onAddMile
 }
 export default Journey
 
-function AddFirstMilestone({ onAdd }: { onAdd: (text: string) => Promise<unknown> }) {
+function AddFirstMilestone({ onAdd, compact }: { onAdd: (text: string) => Promise<unknown>; compact?: boolean }) {
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false)
   const submit = async (e: FormEvent) => {
@@ -187,6 +215,18 @@ function AddFirstMilestone({ onAdd }: { onAdd: (text: string) => Promise<unknown
       setBusy(false)
     }
   }
+  if (compact)
+    return (
+      <form className="j-add-more" onSubmit={submit}>
+        <label className="sr-only" htmlFor="j-add-more">Add a milestone</label>
+        <input id="j-add-more" className="inp" value={text} maxLength={140} placeholder="+ Add a milestone" onChange={(e) => setText(e.target.value)} disabled={busy} />
+        {text.trim() && (
+          <button className="btn sm" type="submit" disabled={busy}>
+            Add
+          </button>
+        )}
+      </form>
+    )
   return (
     <form className="jnow j-add" onSubmit={submit}>
       <label className="nb-t">

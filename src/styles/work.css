@@ -178,3 +178,11 @@ section+section>.grp,.gallery+section>.grp{margin-top:18px}
 .dec-f .other{display:flex;gap:8px;flex-basis:100%;min-width:0}
 .dec-f .other .inp{min-width:0}
 @media (max-width:760px){.opt{flex-wrap:wrap}.opt .btn{margin-left:38px}.dec{padding:14px}}
+
+/* Journey: owner controls (tick the current milestone, add one, tick any in the list) */
+.journey .j-acts{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px}
+.journey .j-add-more{display:flex;gap:6px;flex:1 1 220px;min-width:0}
+.journey .j-add-more .inp{flex:1 1 auto;min-width:0}
+.journey .tl .nd.ck{cursor:pointer;border:1.5px solid var(--line);background:var(--pane);display:inline-grid;place-items:center;padding:0}
+.journey .tl .nd.ck:hover{border-color:var(--accent)}
+.journey .tl li.done .nd.ck{background:var(--accent);border-color:var(--accent);color:#fff}
