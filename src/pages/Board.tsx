@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react'
 import { Bot, Check, CircleHelp, Cloud, Inbox, Lightbulb, Megaphone, MessageCircle, NotebookPen, RotateCcw, Send } from 'lucide-react'
 import { useHQ } from '../App'
+import { BridgeChip } from '../components/bridge'
 import { Ago, Avatar, Badge, Card, Empty, Markdown, Segmented, toneOf } from '../components/ui'
 import { displayName, patchDoc, postMessage, postReply, projectSlug } from '../lib/hq'
 import type { Doc } from '../lib/md'
@@ -79,6 +80,7 @@ export default function Board() {
           <label className="toggle">
             <input type="checkbox" checked={forClaude} onChange={(e) => setForClaude(e.target.checked)} /> <Bot className="i sm" /> Flag for Claude
           </label>
+          <BridgeChip />
           </div>
           <button className="btn primary" disabled={saving || !text.trim()} onClick={send}>
             <Send className="i sm" /> {saving ? 'Posting…' : 'Post'}

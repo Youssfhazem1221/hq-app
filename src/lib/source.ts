@@ -1,35 +1,63 @@
 // Where the data comes from: the local folder (dev) or the private GitHub repo (deployed).
+import { encPath, excluded, ghError, RepoSync, type FileEntry } from './sync'
 
-export type FileEntry = { path: string; text: string }
+export { excluded, type FileEntry }
 export type Me = { login: string; name: string; avatar?: string }
 export type Commit = { sha: string; message: string; author: string; avatar?: string; date: string }
+/** Re-check result: the new file list and the paths that changed. */
+export type Refresh = { files: FileEntry[]; changed: string[] }
+export type Realtime = { topic: string; project?: string }
 
 export interface Source {
   kind: 'local' | 'github'
   label: string
   loadAll(): Promise<FileEntry[]>
+  /** Cheap change check (a free 304 on GitHub). null = nothing changed since the last load. */
+  refresh(): Promise<Refresh | null>
   read(path: string): Promise<string | null>
   write(path: string, text: string, message: string): Promise<void>
   me(): Promise<Me>
-  /** Recent commits, optionally only those touching one path. */
+  /** Recent commits, optionally only those touching one path (a file or a folder). */
   activity(path?: string): Promise<Commit[]>
+  /** Newest commit, for the "files changed" toast. null when unknown or made by this tab. */
+  latest(): Promise<Commit | null>
+  /** Doorbell topic (.hq/realtime.json in the private repo). */
+  realtime(): Promise<Realtime | null>
   webUrl(path: string): string | null
-  /** Local only: answer an AI request right away (on GitHub, an Action does it). */
+  /** Commit the loaded files belong to (GitHub only). */
+  headSha?: string
+  /** Local only: answer an AI request with the old worker (fallback when streaming fails). */
   runAi?(id: string): Promise<void>
 }
 
-/** Skip dot-folders (.claude, .github), the app itself, and node_modules. */
-export const excluded = (p: string) =>
-  p.split('/').some((s) => s.startsWith('.') || s === 'node_modules') || p === 'app' || p.startsWith('app/')
-const isMd = (p: string) => p.toLowerCase().endsWith('.md')
+const realtimeOf = (j: any): Realtime | null =>
+  j && typeof j.topic === 'string' && /^[\w-]{8,80}$/.test(j.topic) ? { topic: j.topic, project: j.project ? String(j.project) : undefined } : null
 
 export class LocalSource implements Source {
   kind = 'local' as const
   label = 'Local folder'
+  private last = new Map<string, string>()
+
+  private remember(files: FileEntry[]) {
+    const before = this.last
+    this.last = new Map(files.map((f) => [f.path, f.text]))
+    const changed = files.filter((f) => before.get(f.path) !== f.text).map((f) => f.path)
+    for (const p of before.keys()) if (!this.last.has(p)) changed.push(p)
+    return changed
+  }
   async loadAll() {
     const r = await fetch('/__hq/files', { cache: 'no-store' })
     if (!r.ok) throw new Error('Local dev server not reachable')
-    return r.json()
+    const files: FileEntry[] = await r.json()
+    this.remember(files)
+    return files
+  }
+  async refresh() {
+    const r = await fetch('/__hq/files', { cache: 'no-store' })
+    if (!r.ok) throw new Error('Local dev server not reachable')
+    const files: FileEntry[] = await r.json()
+    const changed = this.remember(files)
+    return changed.length ? { files, changed } : null
   }
   async read(path: string) {
     const r = await fetch('/__hq/read?path=' + encodeURIComponent(path), { cache: 'no-store' })
@@ -46,6 +74,13 @@ export class LocalSource implements Source {
     const r = await fetch('/__hq/activity' + (path ? '?path=' + encodeURIComponent(path) : ''), { cache: 'no-store' })
     return r.ok ? r.json() : []
   }
+  async latest() {
+    return null
+  }
+  async realtime() {
+    const r = await fetch('/__hq/realtime', { cache: 'no-store' })
+    return r.ok ? realtimeOf(await r.json().catch(() => null)) : null
+  }
   webUrl() {
     return null
   }
@@ -57,22 +92,29 @@ export class LocalSource implements Source {
 
 export type GhConfig = { owner: string; repo: string; branch: string; token: string }
 
-const encPath = (p: string) => p.split('/').map(encodeURIComponent).join('/')
-const b64 = (s: string) => {
-  let bin = ''
-  new TextEncoder().encode(s).forEach((b) => (bin += String.fromCharCode(b)))
-  return btoa(bin)
-}
+const toCommit = (c: any): Commit => ({
+  sha: c.sha,
+  message: String(c.commit.message).split('\n')[0],
+  author: c.author?.login || c.commit.author?.name || '?',
+  avatar: c.author?.avatar_url,
+  date: c.commit.author?.date,
+})
 
 export class GitHubSource implements Source {
   kind = 'github' as const
-  constructor(private c: GhConfig) {}
+  private sync: RepoSync
+  constructor(private c: GhConfig) {
+    this.sync = new RepoSync((p, init) => this.api(p, init), c.owner, c.repo, c.branch)
+  }
   get label() {
     return `${this.c.owner}/${this.c.repo}`
   }
   /** For the Supabase function: it acts with the same token, on the same repo. */
   get auth() {
     return { token: this.c.token, repo: `${this.c.owner}/${this.c.repo}`, branch: this.c.branch }
+  }
+  get headSha() {
+    return this.sync.headSha
   }
 
   private api(path: string, init: RequestInit = {}) {
@@ -89,12 +131,7 @@ export class GitHubSource implements Source {
   }
   private async json(path: string, init?: RequestInit) {
     const r = await this.api(path, init)
-    if (!r.ok) {
-      const msg = (await r.text()).slice(0, 200)
-      if (r.status === 401) throw new Error('GitHub token rejected (expired or wrong). Update it in Settings.')
-      if (r.status === 404) throw new Error('Repo not found, or the token has no access to it. Check Settings.')
-      throw new Error(`GitHub ${r.status}: ${msg}`)
-    }
+    if (!r.ok) throw await ghError(r)
     return r.json()
   }
   private get repoPath() {
@@ -102,27 +139,12 @@ export class GitHubSource implements Source {
   }
 
   async loadAll() {
-    const { owner, repo, branch } = this.c
-    const tree = await this.json(`${this.repoPath}/git/trees/${encodeURIComponent(branch)}?recursive=1`)
-    const paths: string[] = tree.tree
-      .filter((t: any) => t.type === 'blob' && isMd(t.path) && !excluded(t.path))
-      .map((t: any) => t.path)
-    const out: FileEntry[] = []
-    // One GraphQL call fetches up to 80 files' text at once.
-    for (let i = 0; i < paths.length; i += 80) {
-      const chunk = paths.slice(i, i + 80)
-      const fields = chunk
-        .map((p, j) => `f${j}: object(expression: ${JSON.stringify(`${branch}:${p}`)}) { ... on Blob { text } }`)
-        .join('\n')
-      const query = `query { repository(owner: ${JSON.stringify(owner)}, name: ${JSON.stringify(repo)}) { ${fields} } }`
-      const res = await this.json('/graphql', { method: 'POST', body: JSON.stringify({ query }), headers: { 'Content-Type': 'application/json' } })
-      if (res.errors?.length) throw new Error(res.errors[0].message)
-      chunk.forEach((p, j) => {
-        const text = res.data?.repository?.[`f${j}`]?.text
-        if (typeof text === 'string') out.push({ path: p, text })
-      })
-    }
-    return out
+    return (await this.sync.sync()).files
+  }
+  async refresh() {
+    const r = await this.sync.sync()
+    const changed = this.sync.takeChanged(r.changed)
+    return changed.length ? { files: r.files, changed } : null
   }
 
   async read(path: string) {
@@ -134,16 +156,8 @@ export class GitHubSource implements Source {
     return r.text()
   }
 
-  async write(path: string, text: string, message: string) {
-    const url = `${this.repoPath}/contents/${encPath(path)}`
-    let sha: string | undefined
-    const cur = await this.api(`${url}?ref=${encodeURIComponent(this.c.branch)}`)
-    if (cur.ok) sha = (await cur.json()).sha
-    await this.json(url, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message, content: b64(text), branch: this.c.branch, ...(sha ? { sha } : {}) }),
-    })
+  write(path: string, text: string, message: string) {
+    return this.sync.write(path, text, message)
   }
 
   async me() {
@@ -154,13 +168,21 @@ export class GitHubSource implements Source {
   async activity(path?: string) {
     const only = path ? `&path=${encodeURIComponent(path)}` : ''
     const cs = await this.json(`${this.repoPath}/commits?sha=${encodeURIComponent(this.c.branch)}&per_page=15${only}`)
-    return cs.map((c: any) => ({
-      sha: c.sha,
-      message: String(c.commit.message).split('\n')[0],
-      author: c.author?.login || c.commit.author?.name || '?',
-      avatar: c.author?.avatar_url,
-      date: c.commit.author?.date,
-    }))
+    return cs.map(toCommit)
+  }
+
+  async latest() {
+    const [c] = await this.json(`${this.repoPath}/commits?sha=${encodeURIComponent(this.c.branch)}&per_page=1`)
+    return c && !this.sync.own.has(c.sha) ? toCommit(c) : null
+  }
+
+  async realtime() {
+    const text = await this.read('.hq/realtime.json').catch(() => null)
+    try {
+      return text ? realtimeOf(JSON.parse(text)) : null
+    } catch {
+      return null
+    }
   }
 
   webUrl(path: string) {

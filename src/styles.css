@@ -425,3 +425,37 @@ details.sec[open] summary { border-bottom: 1px solid var(--line); margin-bottom:
   .user-col { max-width: 88%; }
 }
 .trend-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+
+/* ---------- live updates: toasts, doorbell dot, Claude bridge chip, streaming status ---------- */
+.toasts { position: fixed; top: 14px; right: 14px; z-index: 60; display: grid; gap: 8px; width: min(380px, calc(100vw - 28px)); pointer-events: none; }
+.toast {
+  pointer-events: auto; display: flex; align-items: center; gap: 8px; padding: 9px 8px 9px 12px; font-size: 0.86rem;
+  background: var(--panel); color: var(--text); border: 1px solid var(--line-strong); border-left: 3px solid var(--tone, var(--accent));
+  border-radius: var(--radius-sm); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16); animation: toast-in 180ms cubic-bezier(.2, .7, .2, 1);
+}
+.toast > svg.i { color: var(--tone, var(--accent)); }
+.toast-t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.toast-x { flex: none; display: grid; place-items: center; width: 26px; height: 26px; border: 0; border-radius: 6px; background: transparent; color: var(--muted); cursor: pointer; }
+.toast-x:hover { background: var(--panel-2); color: var(--text); }
+@keyframes toast-in { from { opacity: 0; transform: translateY(-6px); } }
+.live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--neutral); flex: none; }
+.live-dot.on { background: var(--ok); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 22%, transparent); }
+.bridge-chip {
+  display: inline-flex; align-items: center; gap: 6px; font-size: 0.78rem; font-weight: 600; white-space: nowrap;
+  padding: 3px 10px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel-2); color: var(--muted);
+}
+.bridge-chip .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--neutral); }
+.bridge-chip.is-online { color: var(--text); }
+.bridge-chip.is-online .dot { background: var(--ok); }
+.bridge-chip.is-working { color: var(--text); border-color: color-mix(in srgb, var(--warn) 45%, var(--line)); }
+.bridge-chip.is-working .dot { background: var(--warn); animation: pulse 1.4s ease-in-out infinite; }
+.bridge-chip.is-checking .dot { background: transparent; border: 1.5px solid var(--neutral); }
+@keyframes pulse { 50% { opacity: 0.35; } }
+.live-status { display: inline-flex; align-items: center; gap: 6px; font-size: 0.82rem; color: var(--muted); }
+.doc-group.is-project .doc-group-h { color: var(--text); }
+@media (max-width: 720px) {
+  .toasts { top: auto; bottom: calc(76px + env(safe-area-inset-bottom)); right: 14px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .toast, .bridge-chip.is-working .dot { animation: none; }
+}

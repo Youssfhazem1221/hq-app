@@ -20,9 +20,22 @@ export type Model = {
   answers: Map<string, Doc>
   tasks: Task[]
   projects: Doc[]
+  /** Other .md files inside each project folder (projects/<slug>/…), by slug. */
+  projectFiles: Map<string, Doc[]>
 }
 
-export const projectSlug = (d: Doc) => baseName(d.path)
+// Projects: canonical projects/<slug>/project.md; a legacy flat projects/<slug>.md still works.
+const PROJECT_FILE = /^projects\/([^/]+)\/project\.md$/i
+const LEGACY_PROJECT = /^projects\/([^/]+)\.md$/i
+export const isProjectFile = (p: string) => PROJECT_FILE.test(p) || LEGACY_PROJECT.test(p)
+/** Project a path belongs to: anything under projects/<slug>/, or a legacy projects/<slug>.md. */
+export const projectOfPath = (p: string) => (p.match(/^projects\/([^/]+)\//) || p.match(LEGACY_PROJECT))?.[1]
+export const projectSlug = (d: Doc) => projectOfPath(d.path) || baseName(d.path)
+/** A project's folder (legacy flat projects have none). */
+export const projectFolder = (d: Doc) => (PROJECT_FILE.test(d.path) ? d.path.replace(/\/project\.md$/i, '') : null)
+/** App route for a repo path: a project file opens the project page, other .md files the doc view. */
+export const routeFor = (p: string) =>
+  isProjectFile(p) ? '/projects/' + projectOfPath(p) : p.toLowerCase().endsWith('.md') ? '/docs/' + p : '/docs'
 const STATUS_ORDER = ['active', 'waiting', 'parked', 'done']
 const statusRank = (d: Doc) => {
   const i = STATUS_ORDER.indexOf(String(d.data.status || ''))
@@ -45,6 +58,18 @@ export function buildModel(files: FileEntry[]): Model {
   const answers = new Map<string, Doc>()
   for (const a of under('ai/answers/')) answers.set(String(a.data.request || a.data.id || baseName(a.path)), a)
 
+  // One project per slug; the folder's project.md wins over a leftover legacy file.
+  const projectBySlug = new Map<string, Doc>()
+  for (const d of all.filter((x) => isProjectFile(x.path))) {
+    const s = projectSlug(d)
+    if (!projectBySlug.has(s) || PROJECT_FILE.test(d.path)) projectBySlug.set(s, d)
+  }
+  const projectFiles = new Map<string, Doc[]>()
+  for (const d of [...all].sort((a, b) => a.path.localeCompare(b.path))) {
+    const s = d.path.match(/^projects\/([^/]+)\//)?.[1]
+    if (s && !PROJECT_FILE.test(d.path)) projectFiles.set(s, [...(projectFiles.get(s) || []), d])
+  }
+
   const knowledge = all.filter((d) => !/^(board|todos|people|ai)\//.test(d.path)).sort((a, b) => a.path.localeCompare(b.path))
 
   return {
@@ -61,9 +86,10 @@ export function buildModel(files: FileEntry[]): Model {
     requests: under('ai/requests/').sort(newestFirst),
     answers,
     tasks: knowledge.flatMap((d) => openTasks(d).map((t) => ({ ...t, path: d.path, doc: title(d) }))),
-    projects: under('projects/').sort(
+    projects: [...projectBySlug.values()].sort(
       (a, b) => statusRank(a) - statusRank(b) || String(b.data.updated || '').localeCompare(String(a.data.updated || '')),
     ),
+    projectFiles,
   }
 }
 
@@ -98,7 +124,7 @@ export async function askClaudeToRefresh(src: Source, me: Me, project: Doc) {
   const slug = projectSlug(project)
   const body =
     slug === 'linkedin'
-      ? `Refresh the **LinkedIn tracker**: read my profile, add a new \`metrics\` row to \`projects/linkedin.md\` (date + numbers + source), update \`updated\`, and log anything new.`
+      ? `Refresh the **LinkedIn tracker**: read my profile, add a new \`metrics\` row to \`${project.path}\` (date + numbers + source), update \`updated\`, and log anything new.`
       : `Update the **${project.data.title}** tracker: check progress, tick milestones, refresh \`updated\` and \`next\` in \`${project.path}\`.`
   await postMessage(src, me, { type: 'update', body, forClaude: true, project: slug })
 }

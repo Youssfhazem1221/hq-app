@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react'
 import {
-  ArrowDownRight, ArrowLeft, ArrowRight, ArrowUpRight, Bot, CalendarClock, Check, Circle, FileText, Flag, FolderKanban,
-  History, ListChecks, Minus, Sparkles, TrendingUp,
+  ArrowDownRight, ArrowLeft, ArrowRight, ArrowUpRight, Bot, CalendarClock, Check, Circle, FileText, Files, Flag, FolderKanban,
+  History, Link2, ListChecks, Minus, Sparkles, TrendingUp,
 } from 'lucide-react'
 import { useHQ } from '../App'
+import { BridgeChip } from '../components/bridge'
 import { Chart } from '../components/charts'
 import { Ago, Avatar, Badge, Card, Empty, toneOf } from '../components/ui'
-import { askClaudeToRefresh, displayName, freshness, metrics, milestones, projectSlug } from '../lib/hq'
-import type { Doc } from '../lib/md'
+import { askClaudeToRefresh, displayName, freshness, metrics, milestones, projectFolder, projectSlug } from '../lib/hq'
+import { title, type Doc } from '../lib/md'
 import type { Commit } from '../lib/source'
 import { go } from '../lib/router'
 import { store } from '../lib/util'
@@ -28,6 +29,10 @@ export default function Projects({ slug }: { slug: string }) {
   }
   return (
     <>
+      <div className="row between wrap">
+        <span className="muted small">{model.projects.length} project{model.projects.length === 1 ? '' : 's'}</span>
+        <BridgeChip />
+      </div>
       {[...byOwner.entries()].map(([owner, ps]) => (
         <section key={owner} className="group">
           <h2 className="group-h">
@@ -39,7 +44,10 @@ export default function Projects({ slug }: { slug: string }) {
         </section>
       ))}
       {!model.projects.length && <Empty icon={<FolderKanban className="i" />} text="No projects yet. Ask Claude to start one." />}
-      <p className="muted small">New project? Post on the board with "Flag for Claude", or ask Claude in a session. Each project is a file in <code>projects/</code>.</p>
+      <p className="muted small">
+        New project? Post on the board with "Flag for Claude", or run <code>node scripts/hq.mjs project new "Title"</code>.
+        Each project is a folder: <code>projects/&lt;slug&gt;/project.md</code> plus any docs you put next to it.
+      </p>
     </>
   )
 }
@@ -128,19 +136,22 @@ function ProjectView({ p }: { p: Doc }) {
   const todos = model.todos.filter((t) => t.data.project === slug)
   const posts = model.board.filter((b) => b.data.project === slug)
   const docs = list(p.data.docs).map((x) => model.byPath.get(x)).filter(Boolean) as Doc[]
+  const folder = projectFolder(p)
+  const files = model.projectFiles.get(slug) || []
   const owner = displayName(model, p.data.owner)
   const [acts, setActs] = useState<Commit[] | null>(null)
   const [msg, setMsg] = useState('')
   const [busy, setBusy] = useState(false)
 
   useEffect(() => {
-    const paths = [p.path, p.data.hub].filter(Boolean) as string[]
+    // A folder project's history covers every file in its folder.
+    const paths = [folder || p.path, p.data.hub].filter(Boolean) as string[]
     Promise.all(paths.map((x) => source.activity(x).catch(() => [] as Commit[])))
       .then((rs) => {
         const seen = new Set<string>()
         setActs(rs.flat().filter((c) => !seen.has(c.sha) && seen.add(c.sha)).sort((a, b) => b.date.localeCompare(a.date)))
       })
-  }, [source, loadedAt, p.path])
+  }, [source, loadedAt, p.path, folder])
 
   const refresh = async () => {
     setBusy(true)
@@ -180,8 +191,10 @@ function ProjectView({ p }: { p: Doc }) {
 
       <div className="row wrap">
         <button className="btn primary" disabled={busy} onClick={refresh}><Bot className="i sm" /> Ask Claude to refresh</button>
+        <BridgeChip />
         <button className="btn" onClick={askAbout}><Sparkles className="i sm" /> Ask AI about it</button>
         {p.data.hub && <a className="btn ghost" href={'#/docs/' + p.data.hub}><FileText className="i sm" /> Open hub doc</a>}
+        <a className="btn ghost" href={'#/docs/' + p.path}><FileText className="i sm" /> Project file</a>
         {msg && <span className="small">{msg}</span>}
       </div>
 
@@ -266,12 +279,29 @@ function ProjectView({ p }: { p: Doc }) {
       </div>
 
       <div className="grid two">
-        <Card icon={<FileText className="i" />} title="Docs">
+        <Card icon={<Files className="i" />} title="Files in this project" extra={<span className="muted small num">{files.length}</span>}>
+          {files.length ? (
+            <ul className="link-list">
+              {files.map((d) => (
+                <li key={d.path}>
+                  <a href={'#/docs/' + d.path}>{title(d)}</a>
+                  <span className="muted small" title={d.path}>{d.path.slice(`projects/${slug}/`.length)}</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <Empty
+              icon={<Files className="i" />}
+              text={folder ? <>No other files yet. Any <code>.md</code> saved in <code>{folder}/</code> shows up here.</> : <>Old single-file project. Move it to <code>projects/{slug}/project.md</code> to keep docs next to it.</>}
+            />
+          )}
+        </Card>
+        <Card icon={<Link2 className="i" />} title="Linked docs">
           {docs.length ? (
             <ul className="link-list">
               {docs.map((d) => (
                 <li key={d.path}>
-                  <a href={'#/docs/' + d.path}>{String(d.data.title || d.path)}</a>
+                  <a href={'#/docs/' + d.path}>{String(d.data.title || title(d))}</a>
                   {d.data.updated && <span className="muted small">updated {String(d.data.updated)}</span>}
                 </li>
               ))}
@@ -280,35 +310,36 @@ function ProjectView({ p }: { p: Doc }) {
             <Empty icon={<FileText className="i" />} text="No linked docs." />
           )}
         </Card>
-        <Card icon={<History className="i" />} title="Activity">
-          {posts.length > 0 && (
-            <ul className="feed">
-              {posts.slice(0, 5).map((b) => (
-                <li key={b.path}>
-                  <Avatar name={displayName(model, b.data.author)} size={22} />
-                  <a className="feed-msg" href="#/board">{b.body.trim().split('\n')[0].replace(/\*\*/g, '')}</a>
-                  <Ago iso={b.data.created} />
-                </li>
-              ))}
-            </ul>
-          )}
-          {acts === null ? (
-            <span className="muted">Loading…</span>
-          ) : acts.length ? (
-            <ul className="feed">
-              {acts.slice(0, 8).map((c) => (
-                <li key={c.sha}>
-                  <Avatar name={c.author} src={c.avatar} size={22} />
-                  <span className="feed-msg">{c.message}</span>
-                  <Ago iso={c.date} />
-                </li>
-              ))}
-            </ul>
-          ) : (
-            !posts.length && <Empty icon={<History className="i" />} text="File history appears once the repo is on GitHub." />
-          )}
-        </Card>
       </div>
+
+      <Card icon={<History className="i" />} title="Activity">
+        {posts.length > 0 && (
+          <ul className="feed">
+            {posts.slice(0, 5).map((b) => (
+              <li key={b.path}>
+                <Avatar name={displayName(model, b.data.author)} size={22} />
+                <a className="feed-msg" href="#/board">{b.body.trim().split('\n')[0].replace(/\*\*/g, '')}</a>
+                <Ago iso={b.data.created} />
+              </li>
+            ))}
+          </ul>
+        )}
+        {acts === null ? (
+          <span className="muted">Loading…</span>
+        ) : acts.length ? (
+          <ul className="feed">
+            {acts.slice(0, 8).map((c) => (
+              <li key={c.sha}>
+                <Avatar name={c.author} src={c.avatar} size={22} />
+                <span className="feed-msg">{c.message}</span>
+                <Ago iso={c.date} />
+              </li>
+            ))}
+          </ul>
+        ) : (
+          !posts.length && <Empty icon={<History className="i" />} text="File history appears once the repo is on GitHub." />
+        )}
+      </Card>
     </>
   )
 }

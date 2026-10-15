@@ -1,13 +1,19 @@
 import { useMemo, useState, type ReactNode } from 'react'
-import { ArrowRight, Briefcase, ExternalLink, FileQuestion, FileText, Folder, Lightbulb, ListTree, Pin, Sparkles, Telescope } from 'lucide-react'
+import { ArrowRight, Briefcase, ExternalLink, FileQuestion, FileText, Folder, FolderKanban, Lightbulb, ListTree, Pin, Sparkles, Telescope } from 'lucide-react'
 import { useHQ } from '../App'
 import { Badge, Card, Empty, Markdown, Segmented, toneOf } from '../components/ui'
-import { askAi } from '../lib/hq'
+import { isProjectFile, projectOfPath, projectSlug } from '../lib/hq'
 import { sections, stripH1, title, type Doc } from '../lib/md'
 import { go } from '../lib/router'
 import { store } from '../lib/util'
 
 const FOLDER_ICON: Record<string, ReactNode> = { '': <Pin className="i sm" />, investigations: <Telescope className="i sm" />, linkedin: <Briefcase className="i sm" /> }
+
+/** Group key: a project folder (projects/<slug>) is its own group; otherwise the top folder ('' = root). */
+const groupOf = (p: string) => {
+  const project = p.match(/^projects\/([^/]+)\//)?.[1]
+  return project ? `projects/${project}` : p.includes('/') ? p.split('/')[0] : ''
+}
 
 export default function Docs({ path }: { path: string }) {
   const { model } = useHQ()
@@ -20,25 +26,30 @@ export default function Docs({ path }: { path: string }) {
       (d) => !needle || title(d).toLowerCase().includes(needle) || d.path.toLowerCase().includes(needle) || d.body.toLowerCase().includes(needle),
     )
     const g = new Map<string, Doc[]>()
-    for (const d of hits) {
-      const folder = d.path.includes('/') ? d.path.split('/')[0] : ''
-      g.set(folder, [...(g.get(folder) || []), d])
-    }
+    for (const d of hits) g.set(groupOf(d.path), [...(g.get(groupOf(d.path)) || []), d])
+    // Inside a project folder, project.md comes first.
+    for (const docs of g.values()) docs.sort((a, b) => Number(isProjectFile(b.path)) - Number(isProjectFile(a.path)) || a.path.localeCompare(b.path))
     return [...g.entries()].sort(([a], [b]) => (a === '' ? -1 : b === '' ? 1 : a.localeCompare(b)))
   }, [model, q])
+
+  const label = (key: string) => {
+    const slug = key.match(/^projects\/(.+)$/)?.[1]
+    if (!slug) return key || 'Core'
+    return String(model.projects.find((p) => projectSlug(p) === slug)?.data.title || slug)
+  }
 
   return (
     <div className="docs">
       <aside className={'doc-list' + (doc ? ' has-doc' : '')}>
         <input placeholder="Search docs…" value={q} onChange={(e) => setQ(e.target.value)} />
-        {groups.map(([folder, docs]) => (
-          <div key={folder} className="doc-group">
-            <div className="doc-group-h">
-              {FOLDER_ICON[folder] || <Folder className="i sm" />} {folder || 'Core'}
+        {groups.map(([key, docs]) => (
+          <div key={key} className={'doc-group' + (key.startsWith('projects/') ? ' is-project' : '')}>
+            <div className="doc-group-h" title={key || 'Top-level files'}>
+              {key.startsWith('projects/') ? <FolderKanban className="i sm" /> : FOLDER_ICON[key] || <Folder className="i sm" />} {label(key)}
             </div>
             {docs.map((d) => (
-              <a key={d.path} href={'#/docs/' + d.path} className={'doc-link' + (d.path === path ? ' on' : '')}>
-                <span>{title(d)}</span>
+              <a key={d.path} href={'#/docs/' + d.path} className={'doc-link' + (d.path === path ? ' on' : '')} title={d.path}>
+                <span>{key.startsWith('projects/') && isProjectFile(d.path) ? 'Project overview' : title(d)}</span>
                 {d.data.status && <Badge tone={toneOf(d.data.status)}>{d.data.status}</Badge>}
               </a>
             ))}
@@ -77,36 +88,31 @@ function Overview() {
 }
 
 function DocView({ doc }: { doc: Doc }) {
-  const { source, me, reload } = useHQ()
+  const { source, model } = useHQ()
   const [mode, setModeState] = useState<'outline' | 'full'>(store.get('hq.docmode', 'outline'))
   const setMode = (m: 'outline' | 'full') => {
     store.set('hq.docmode', m)
     setModeState(m)
   }
   const [openAll, setOpenAll] = useState<boolean | null>(null)
-  const [busy, setBusy] = useState(false)
   const body = stripH1(doc.body)
   const secs = sections(body)
   const intro = secs[0] && !secs[0].title ? secs[0] : null
   const rest = intro ? secs.slice(1) : secs
   const web = source.webUrl(doc.path)
+  const slug = projectOfPath(doc.path)
+  const project = slug ? model.projects.find((p) => projectSlug(p) === slug) : undefined
 
-  const summarize = async () => {
-    setBusy(true)
-    try {
-      const id = await askAi(source, me, {
-        kind: 'summarize',
-        target: doc.path,
-        question: `Summarize ${doc.path} for me: top line first, then at most 7 bullets, then the single next step.`,
-      })
-      if (source.runAi) await source.runAi(id)
-      await reload()
-      go('/ask')
-    } catch (e: any) {
-      alert(e?.message || e)
-    } finally {
-      setBusy(false)
-    }
+  // Summaries stream on the Ask page like any question.
+  const summarize = () => {
+    store.set('hq.askPrefill', {
+      q: `Summarize ${doc.path} for me: top line first, then at most 7 bullets, then the single next step.`,
+      kind: 'summarize',
+      target: doc.path,
+      project: slug,
+      auto: true,
+    })
+    go('/ask')
   }
 
   return (
@@ -118,6 +124,11 @@ function DocView({ doc }: { doc: Doc }) {
           {doc.data.status && <Badge tone={toneOf(doc.data.status)}>{doc.data.status}</Badge>}
           {doc.data.updated && <span className="muted small">updated {String(doc.data.updated)}</span>}
           <span className="muted small">· {doc.path}</span>
+          {project && (
+            <a className="proj-chip" href={'#/projects/' + slug} title="Open the project page">
+              <FolderKanban className="i sm" /> {String(project.data.title || slug)}
+            </a>
+          )}
           {web && <a className="small meta-line" href={web} target="_blank" rel="noopener">GitHub <ExternalLink className="i sm" /></a>}
         </div>
       </div>
@@ -138,8 +149,8 @@ function DocView({ doc }: { doc: Doc }) {
               <button className="btn ghost sm" onClick={() => setOpenAll(false)}>Collapse all</button>
             </>
           )}
-          <button className="btn sm" disabled={busy} onClick={summarize}>
-            <Sparkles className="i sm" /> {busy ? 'Asking…' : 'Summarize'}
+          <button className="btn sm" onClick={summarize}>
+            <Sparkles className="i sm" /> Summarize
           </button>
         </div>
       </div>

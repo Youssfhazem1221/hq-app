@@ -1,4 +1,5 @@
 import { useMemo, type ReactNode } from 'react'
+import { routeFor } from '../lib/hq'
 import { resolvePath, toHtml } from '../lib/md'
 import { ago } from '../lib/util'
 import { go } from '../lib/router'
@@ -74,7 +75,7 @@ export const Ago = ({ iso }: { iso?: unknown }) => (
 )
 
 /** Rendered markdown; relative .md links open inside the app. */
-/** AI answers cite files like [projects/linkedin.md] or [a.md, b.md]: turn them into links. */
+/** AI answers cite files like [projects/linkedin/project.md] or [a.md, b.md]: turn them into links. */
 const linkCitations = (md: string) =>
   md.replace(/\[((?:[\w./-]+\.md)(?:,\s*[\w./-]+\.md)*)\](?!\()/g, (_, list: string) =>
     list.split(/,\s*/).map((p) => `[${p}](/${p})`).join(', '),
@@ -119,8 +120,8 @@ function MarkdownText({ md, base = '' }: { md: string; base?: string }) {
     e.preventDefault()
     const clean = decodeURIComponent(href.split('#')[0].replace(/:\d+$/, ''))
     const target = clean.startsWith('/') ? clean.slice(1) : resolvePath(base, clean)
-    const project = target.match(/^projects\/([\w-]+)\.md$/)
-    go(project ? '/projects/' + project[1] : target.toLowerCase().endsWith('.md') ? '/docs/' + target : '/docs')
+    // projects/<slug>/project.md (or a legacy projects/<slug>.md) → project page; other paths → doc view.
+    go(routeFor(target))
   }
   return <div className="md" onClick={onClick} dangerouslySetInnerHTML={{ __html: html }} />
 }
