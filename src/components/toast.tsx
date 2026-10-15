@@ -1,19 +1,13 @@
-import { useSyncExternalStore, type ReactNode } from 'react'
-import { Bot, GitCommitHorizontal, HardDrive, Info, TriangleAlert, X } from 'lucide-react'
+import { useSyncExternalStore } from 'react'
+import { Icon } from '../lib/icons'
+import { HQ_EVENTS, fire, type IconName, type ToastKind, type ToastOpts } from '../lib/contracts'
 
-export type ToastKind = 'commit' | 'local' | 'bot' | 'info' | 'error'
-type Toast = { id: number; kind: ToastKind; text: string }
+export type { ToastKind }
+type Toast = { id: number; kind: ToastKind; text: string; undo?: () => void }
 
-const ICON: Record<ToastKind, ReactNode> = {
-  commit: <GitCommitHorizontal className="i sm" />,
-  local: <HardDrive className="i sm" />,
-  bot: <Bot className="i sm" />,
-  info: <Info className="i sm" />,
-  error: <TriangleAlert className="i sm" />,
-}
-const TONE: Record<ToastKind, string> = { commit: 'info', local: 'info', bot: 'accent', info: 'muted', error: 'bad' }
+const ICON: Record<ToastKind, IconName> = { commit: 'commit', local: 'local', bot: 'bot', info: 'info', error: 'alert', ok: 'check', you: 'inbox' }
 const HIDE_MS = 6000
-const MAX = 4
+const MAX = 2
 
 let toasts: Toast[] = []
 let nextId = 1
@@ -21,18 +15,20 @@ const subs = new Set<() => void>()
 const emit = () => subs.forEach((cb) => cb())
 
 export function dismiss(id: number) {
+  const before = toasts.length
   toasts = toasts.filter((t) => t.id !== id)
-  emit()
+  if (toasts.length !== before) emit()
 }
 
-/** One-line notice, top-right, gone after 6 s. The same text twice in a row is shown once. */
-export function toast(text: string, kind: ToastKind = 'info') {
+/** One-line notice (bottom right; above the bottom bar on phones), gone after 6 s, at most 2 on screen. `undo` adds an
+ *  Undo button. The same text twice in a row is shown once. */
+export function toast(text: string, kind: ToastKind = 'info', opts: ToastOpts = {}) {
   const line = String(text).split('\n')[0].trim()
   if (!line || toasts.some((t) => t.text === line)) return
   const id = nextId++
-  toasts = [...toasts, { id, kind, text: line }].slice(-MAX)
+  toasts = [...toasts, { id, kind, text: line, undo: opts.undo }].slice(-MAX)
   emit()
-  setTimeout(() => dismiss(id), HIDE_MS)
+  setTimeout(() => dismiss(id), opts.ms ?? HIDE_MS)
 }
 
 const subscribe = (cb: () => void) => {
@@ -40,17 +36,35 @@ const subscribe = (cb: () => void) => {
   return () => void subs.delete(cb)
 }
 
+/** Open the check-in sheet (event hq:checkin). The sheet mounts right after the first paint (once a workspace is open);
+ *  before that, one plain toast says why nothing opened. Every Check in button uses this, so the words match. */
+export function openCheckin(detail: object = {}, connected = true): boolean {
+  if (fire(HQ_EVENTS.checkin, detail)) return true
+  toast(connected ? 'Check-in is still loading. Try again in a second.' : 'Connect your workspace in Settings to check in', 'info')
+  return false
+}
+
 export function Toasts() {
-  const list = useSyncExternalStore(subscribe, () => toasts)
-  if (!list.length) return null
+  const list = useSyncExternalStore(subscribe, () => toasts, () => toasts)
   return (
     <div className="toasts" role="status" aria-live="polite">
       {list.map((t) => (
-        <div key={t.id} className={`toast tone-${TONE[t.kind]}`}>
-          {ICON[t.kind]}
+        <div key={t.id} className={`toast k-${t.kind}`}>
+          <Icon name={ICON[t.kind]} size="s" />
           <span className="toast-t" title={t.text}>{t.text}</span>
-          <button className="toast-x" onClick={() => dismiss(t.id)} aria-label="Dismiss">
-            <X className="i sm" />
+          {t.undo && (
+            <button
+              type="button"
+              onClick={() => {
+                dismiss(t.id)
+                t.undo?.()
+              }}
+            >
+              Undo
+            </button>
+          )}
+          <button type="button" className="toast-x" onClick={() => dismiss(t.id)} aria-label="Dismiss">
+            <Icon name="x" size="s" />
           </button>
         </div>
       ))}

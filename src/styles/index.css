@@ -1,0 +1,6 @@
+/* HQ v3 styles, in cascade order: tokens -> base -> shell -> components. main.tsx imports this file, then each module's
+   own file (visuals.css · work.css · read.css · people.css · look.css). */
+@import './tokens.css';
+@import './base.css';
+@import './shell.css';
+@import './components.css';

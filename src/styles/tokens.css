@@ -1,0 +1,113 @@
+/* =====================================================================
+   HQ v3 tokens · one look: "Notion x Obsidian" (calm canvas, violet ink, file-native)
+   Layers: tokens -> base -> shell -> components -> module files (visuals, work, read, people, look)
+   Breakpoints (one set, same numbers as src/lib/bp.ts): phone <= 760px · narrow <= 1100px.
+   Prefs are applied ONLY as enum data-* attributes on <html> (see the end of this file).
+   ===================================================================== */
+:root{
+  --font-ui:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI Variable Text","Segoe UI",system-ui,sans-serif;
+  --font-mono:ui-monospace,"Cascadia Mono","SF Mono",Menlo,Consolas,monospace;
+  --fs:1; --lh:1.55; --ls:0em; --d:1;
+  /* type scale */
+  --t-xs:.75rem; --t-sm:.8125rem; --t-md:.9375rem; --t-lg:1.0625rem; --t-xl:1.25rem; --t-2xl:1.5rem; --t-3xl:2rem;
+  /* space (4-base, density-scaled) */
+  --s1:calc(4px*var(--d)); --s2:calc(8px*var(--d)); --s3:calc(12px*var(--d)); --s4:calc(16px*var(--d));
+  --s5:calc(20px*var(--d)); --s6:calc(24px*var(--d)); --s8:calc(32px*var(--d)); --s10:calc(40px*var(--d)); --s14:calc(56px*var(--d));
+  --r-xs:6px; --r-sm:8px; --r:12px; --r-lg:16px; --r-pill:999px;
+  --e1:0 1px 2px rgba(0,0,0,.05);
+  --e2:0 1px 2px rgba(0,0,0,.05),0 10px 30px rgba(0,0,0,.08);
+  --e3:0 2px 6px rgba(0,0,0,.06),0 24px 64px rgba(0,0,0,.18);
+  --ease:cubic-bezier(.2,.8,.2,1);
+  --dur-1:120ms; --dur-2:180ms; --dur-3:260ms; --dur-4:420ms;
+  --sbw:252px;
+  /* light neutrals */
+  --bg:#ffffff; --side:#f7f7f7; --pane:#f6f6f6; --pane-2:#ececec; --raise:#ffffff; --hover:rgba(0,0,0,.045); --press:rgba(0,0,0,.07);
+  --fg:#222222; --fg-2:#454545; --muted:#6a6a6a; --line:#e8e8e8; --line-2:#d4d4d4; --scrim:rgba(15,15,15,.32);
+  /* accent (violet default): fill (white text, AA) · ink (text) · wash */
+  --accent:#7c5cec; --accent-ink:#5b3fd0; --accent-wash:#efeafe; --on-accent:#ffffff;
+  /* status (state only, always icon + word; never series colours) */
+  --ok:#1f8a4c; --ok-ink:#176b3b; --ok-wash:#e3f3e9;
+  --warn:#b87400; --warn-ink:#875400; --warn-wash:#fbf0da;
+  --bad:#d1343a; --bad-ink:#b02a30; --bad-wash:#fdeaea;
+  /* dataviz categorical (validated, fixed order) = project colour slots 1-8 */
+  --viz-1:#2a78d6; --viz-2:#eb6834; --viz-3:#1baf7a; --viz-4:#eda100; --viz-5:#e87ba4; --viz-6:#008300; --viz-7:#4a3aa7; --viz-8:#e34948;
+  --seq-1:#cde2fb; --seq-2:#9ec5f4; --seq-3:#5598e7; --seq-4:#2a78d6; --seq-5:#184f95;
+  --grid:#ececec; --axis:#d0d0d0;
+  /* meaningful marks >= 3:1: 'later' beads/nodes, context points, dashed tracks */
+  --mark-empty:#8c8c8c; --mark-ctx:#8c8c8c;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#1e1e1e; --side:#191919; --pane:#252525; --pane-2:#2e2e2e; --raise:#262626; --hover:rgba(255,255,255,.055); --press:rgba(255,255,255,.09);
+    --fg:#dcddde; --fg-2:#b8b9ba; --muted:#9a9a9a; --line:#323232; --line-2:#454545; --scrim:rgba(0,0,0,.55);
+    --accent-ink:#ad93fb; --accent-wash:rgba(139,108,239,.18);
+    --ok:#44cf6e; --ok-ink:#6ad98a; --ok-wash:rgba(68,207,110,.13);
+    --warn:#e0ac00; --warn-ink:#ebbf3c; --warn-wash:rgba(224,172,0,.14);
+    --bad:#fb464c; --bad-ink:#ff7b80; --bad-wash:rgba(251,70,76,.14);
+    --viz-1:#3987e5; --viz-2:#d95926; --viz-3:#199e70; --viz-4:#c98500; --viz-5:#d55181; --viz-6:#008300; --viz-7:#9085e9; --viz-8:#e66767;
+    --seq-1:#184f95; --seq-2:#256abf; --seq-3:#3987e5; --seq-4:#6da7ec; --seq-5:#b7d3f6;
+    --grid:#303030; --axis:#4a4a4a; --mark-empty:#7a7a7a; --mark-ctx:#7a7a7a;
+    --e1:0 1px 2px rgba(0,0,0,.4); --e2:0 1px 2px rgba(0,0,0,.4),0 12px 32px rgba(0,0,0,.45); --e3:0 2px 8px rgba(0,0,0,.5),0 24px 64px rgba(0,0,0,.6);
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#1e1e1e; --side:#191919; --pane:#252525; --pane-2:#2e2e2e; --raise:#262626; --hover:rgba(255,255,255,.055); --press:rgba(255,255,255,.09);
+  --fg:#dcddde; --fg-2:#b8b9ba; --muted:#9a9a9a; --line:#323232; --line-2:#454545; --scrim:rgba(0,0,0,.55);
+  --accent-ink:#ad93fb; --accent-wash:rgba(139,108,239,.18);
+  --ok:#44cf6e; --ok-ink:#6ad98a; --ok-wash:rgba(68,207,110,.13);
+  --warn:#e0ac00; --warn-ink:#ebbf3c; --warn-wash:rgba(224,172,0,.14);
+  --bad:#fb464c; --bad-ink:#ff7b80; --bad-wash:rgba(251,70,76,.14);
+  --viz-1:#3987e5; --viz-2:#d95926; --viz-3:#199e70; --viz-4:#c98500; --viz-5:#d55181; --viz-6:#008300; --viz-7:#9085e9; --viz-8:#e66767;
+  --seq-1:#184f95; --seq-2:#256abf; --seq-3:#3987e5; --seq-4:#6da7ec; --seq-5:#b7d3f6;
+  --grid:#303030; --axis:#4a4a4a; --mark-empty:#7a7a7a; --mark-ctx:#7a7a7a;
+  --e1:0 1px 2px rgba(0,0,0,.4); --e2:0 1px 2px rgba(0,0,0,.4),0 12px 32px rgba(0,0,0,.45); --e3:0 2px 8px rgba(0,0,0,.5),0 24px 64px rgba(0,0,0,.6);
+  color-scheme:dark;
+}
+
+/* accents: fill (white text, AA in both modes) · ink (text) · wash */
+:root[data-accent="blue"]{--accent:#2f6fdb;--accent-ink:#1f56b3;--accent-wash:#e7effc}
+:root[data-accent="green"]{--accent:#1b7d44;--accent-ink:#176b3b;--accent-wash:#e3f3e9}
+:root[data-accent="amber"]{--accent:#b45f06;--accent-ink:#8a4a04;--accent-wash:#fbefe0}
+:root[data-accent="rose"]{--accent:#d1386e;--accent-ink:#a82a55;--accent-wash:#fce8ef}
+:root[data-accent="slate"]{--accent:#5b6475;--accent-ink:#434b59;--accent-wash:#eceef2}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"])[data-accent="blue"]{--accent-ink:#8fb6f5;--accent-wash:rgba(47,111,219,.2)}
+  :root:not([data-theme="light"])[data-accent="green"]{--accent-ink:#6ad98a;--accent-wash:rgba(27,125,68,.24)}
+  :root:not([data-theme="light"])[data-accent="amber"]{--accent-ink:#f0b45a;--accent-wash:rgba(180,95,6,.24)}
+  :root:not([data-theme="light"])[data-accent="rose"]{--accent-ink:#f39abb;--accent-wash:rgba(209,56,110,.22)}
+  :root:not([data-theme="light"])[data-accent="slate"]{--accent-ink:#b9c0cc;--accent-wash:rgba(138,147,163,.2)}
+}
+:root[data-theme="dark"][data-accent="blue"]{--accent-ink:#8fb6f5;--accent-wash:rgba(47,111,219,.2)}
+:root[data-theme="dark"][data-accent="green"]{--accent-ink:#6ad98a;--accent-wash:rgba(27,125,68,.24)}
+:root[data-theme="dark"][data-accent="amber"]{--accent-ink:#f0b45a;--accent-wash:rgba(180,95,6,.24)}
+:root[data-theme="dark"][data-accent="rose"]{--accent-ink:#f39abb;--accent-wash:rgba(209,56,110,.22)}
+:root[data-theme="dark"][data-accent="slate"]{--accent-ink:#b9c0cc;--accent-wash:rgba(138,147,163,.2)}
+
+/* project colour = `color: 1..8` → slot class (never an inline value from data) */
+/* (pc1-pc8, not c1-c8: the grid span classes .c4-.c12 in components.css must never set a colour) */
+.pc1{--pc:var(--viz-1)} .pc2{--pc:var(--viz-2)} .pc3{--pc:var(--viz-3)} .pc4{--pc:var(--viz-4)}
+.pc5{--pc:var(--viz-5)} .pc6{--pc:var(--viz-6)} .pc7{--pc:var(--viz-7)} .pc8{--pc:var(--viz-8)}
+
+/* ---------- prefs (validated enum data-* attributes only) ---------- */
+:root[data-size="s"]{--fs:.9} :root[data-size="l"]{--fs:1.1} :root[data-size="xl"]{--fs:1.2} :root[data-size="xxl"]{--fs:1.35}
+:root[data-density="compact"]{--d:.82} :root[data-density="spacious"]{--d:1.2}
+:root[data-font="lexend"]{--font-ui:"Lexend",system-ui,sans-serif}
+:root[data-font="atkinson"]{--font-ui:"Atkinson Hyperlegible",system-ui,sans-serif}
+:root[data-font="system"]{--font-ui:system-ui,-apple-system,"Segoe UI",sans-serif}
+:root[data-lh="relaxed"]{--lh:1.75} :root[data-lh="loose"]{--lh:1.95}
+:root[data-ls="wide"]{--ls:.02em}
+:root[data-contrast="high"]{--fg:#000;--fg-2:#111;--muted:#3b3b3b;--line:#8c8c8c;--line-2:#5a5a5a;--accent-ink:#3a1fb0;--pane:#f2f2f2}
+:root[data-contrast="high"][data-theme="dark"]{--fg:#fff;--fg-2:#f0f0f0;--muted:#d0d0d0;--line:#8a8a8a;--line-2:#b0b0b0;--accent-ink:#cbbcff;--pane:#2a2a2a}
+:root[data-contrast="high"] :is(p,li,dd,.callout) a{text-decoration:underline}
+:root[data-contrast="high"] :focus-visible{outline-width:3px}
+:root[data-calm="on"] .nav .badge{font-size:0;min-width:8px;width:8px;height:8px;padding:0;background:var(--muted)}
+:root[data-calm="on"] .st,:root[data-calm="on"] .chip.ok,:root[data-calm="on"] .chip.warn{background:var(--pane-2);color:var(--fg-2)}
+:root[data-calm="on"] .nextbar.hero{background:var(--pane)}
+:root[data-focus="on"] .w[data-secondary],:root[data-focus="on"] .secondary{display:none}
+:root[data-focus="on"] .grid>*{grid-column:span 12}
+:root[data-motion="reduced"] *,:root[data-motion="reduced"] *::before,:root[data-motion="reduced"] *::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important;scroll-behavior:auto!important}
+@media (prefers-reduced-motion:reduce){
+  :root:not([data-motion="full"]) *,:root:not([data-motion="full"]) *::before,:root:not([data-motion="full"]) *::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important;scroll-behavior:auto!important}
+}

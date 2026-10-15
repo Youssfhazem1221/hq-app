@@ -1,9 +1,32 @@
 // Where the data comes from: the local folder (dev) or the private GitHub repo (deployed).
-import { encPath, excluded, ghError, RepoSync, type FileEntry } from './sync'
+import { commitActor } from './people-core'
+import { encPath, excluded, ghError, RepoSync, StaleWriteError, updateLoop, type FileEntry, type UpdateFn } from './sync'
 
-export { excluded, type FileEntry }
-export type Me = { login: string; name: string; avatar?: string }
-export type Commit = { sha: string; message: string; author: string; avatar?: string; date: string }
+export { excluded, StaleWriteError, updateLoop, type FileEntry, type UpdateFn }
+/** `configured` (local mode only): false = HQ_LOCAL_LOGIN is not set, so `login` is the default owner login. Local
+ *  project writes are refused then; the UI should say "set HQ_LOCAL_LOGIN in .env.local". */
+export type Me = { login: string; name: string; avatar?: string; configured?: boolean }
+/** `message` = the subject line; `body` = the rest of the message; `actor` = who really did it ('claude' for
+ *  commits with the Claude trailer or a `claude:` subject, 'hq-ai' / 'hq-digest' for the bots, else `author`). */
+export type Commit = { sha: string; message: string; body: string; author: string; actor: string; avatar?: string; date: string }
+
+/** A Commit from a full message (subject + body). `actorName` = the git author name, used to spot the bots. */
+export function commitOf(c: { sha: string; full: string; author: string; actorName?: string; avatar?: string; date: string }): Commit {
+  const full = String(c.full || '')
+  const [subject = '', ...rest] = full.split(/\r?\n/)
+  const name = String(c.actorName || '')
+  const actor = commitActor({ message: full, author: /^hq-(ai|digest)$/i.test(name) ? name : c.author })
+  return { sha: c.sha, message: subject, body: rest.join('\n').trim(), author: c.author, actor, avatar: c.avatar, date: c.date }
+}
+
+/** A text without a leading byte-order mark (U+FEFF). */
+const noBom = (s: string) => (s.charCodeAt(0) === 0xfeff ? s.slice(1) : s)
+
+/** sha1 (hex) of a text, the way the local dev server checks `expect` (a leading BOM is ignored). */
+export async function sha1hex(text: string) {
+  const buf = await crypto.subtle.digest('SHA-1', new TextEncoder().encode(noBom(String(text))))
+  return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('')
+}
 /** Re-check result: the new file list and the paths that changed. */
 export type Refresh = { files: FileEntry[]; changed: string[] }
 export type Realtime = { topic: string; project?: string }
@@ -16,6 +39,12 @@ export interface Source {
   refresh(): Promise<Refresh | null>
   read(path: string): Promise<string | null>
   write(path: string, text: string, message: string): Promise<void>
+  /**
+   * Safe read-modify-write: `fn(current text | null)` → the new text, or null / the same text to skip. If the file
+   * changes meanwhile (another tab, device or person), `fn` runs again on the newer text (≤3 tries). So `fn` must
+   * be pure. true = written (one commit on GitHub), false = nothing to change.
+   */
+  update(path: string, fn: UpdateFn, message: string): Promise<boolean>
   me(): Promise<Me>
   /** Recent commits, optionally only those touching one path (a file or a folder). */
   activity(path?: string): Promise<Commit[]>
@@ -37,6 +66,8 @@ export class LocalSource implements Source {
   kind = 'local' as const
   label = 'Local folder'
   private last = new Map<string, string>()
+  /** Text this tab itself just wrote, per path: the dev server's file event for it is not "changed on this PC". */
+  private own = new Map<string, string>()
 
   private remember(files: FileEntry[]) {
     const before = this.last
@@ -50,6 +81,7 @@ export class LocalSource implements Source {
     if (!r.ok) throw new Error('Local dev server not reachable')
     const files: FileEntry[] = await r.json()
     this.remember(files)
+    this.own.clear()
     return files
   }
   async refresh() {
@@ -57,22 +89,60 @@ export class LocalSource implements Source {
     if (!r.ok) throw new Error('Local dev server not reachable')
     const files: FileEntry[] = await r.json()
     const changed = this.remember(files)
-    return changed.length ? { files, changed } : null
+    if (!changed.length) return null
+    // Our own writes still rebuild the model, but they are not reported as someone else's change (no toast).
+    const theirs = changed.filter((p) => !this.own.has(p) || this.own.get(p) !== this.last.get(p))
+    for (const p of changed) this.own.delete(p)
+    return { files, changed: theirs }
   }
   async read(path: string) {
     const r = await fetch('/__hq/read?path=' + encodeURIComponent(path), { cache: 'no-store' })
-    return r.status === 404 ? null : r.text()
+    if (r.status === 404) return null
+    // an error body must never be taken for the file's text (update() would edit it)
+    if (!r.ok) throw new Error(`Local dev server: could not read ${path} (${r.status})`)
+    return r.text()
+  }
+  /** `expect`: sha1 of the text this change was based on, or 'absent' (create-only). The server answers 409 when
+   *  the file is not that version any more. Without `expect` it overwrites (the old behaviour). */
+  private async send(path: string, text: string, expect?: string) {
+    const r = await fetch('/__hq/write', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(expect === undefined ? { path, text } : { path, text, expect }),
+    })
+    if (r.status === 409) throw new StaleWriteError(`Not saved: ${path} was changed on disk just now. Make your change again.`)
+    if (!r.ok) throw new Error(`Save failed: ${await r.text()}`)
+    this.own.set(path, text)
   }
   async write(path: string, text: string) {
-    const r = await fetch('/__hq/write', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ path, text }) })
-    if (!r.ok) throw new Error(`Save failed: ${await r.text()}`)
+    await this.send(path, text)
+  }
+  update(path: string, fn: UpdateFn) {
+    // A new file (not in the last file list): skip the first read, whose 404 the browser logs as a console error, and
+    // create it with expect 'absent'. If it exists after all, the server answers 409 and the next try reads it for real.
+    let assumeNew = this.last.size > 0 && !this.last.has(path)
+    return updateLoop(
+      () => {
+        if (!assumeNew) return this.read(path)
+        assumeNew = false
+        return null
+      },
+      async (next, cur) => this.send(path, next, cur === null ? 'absent' : await sha1hex(cur)),
+      fn,
+      3,
+      path,
+    )
   }
   async me() {
     return (await fetch('/__hq/me')).json()
   }
-  async activity(path?: string) {
+  async activity(path?: string): Promise<Commit[]> {
     const r = await fetch('/__hq/activity' + (path ? '?path=' + encodeURIComponent(path) : ''), { cache: 'no-store' })
-    return r.ok ? r.json() : []
+    if (!r.ok) return []
+    const list = await r.json().catch(() => [])
+    return (Array.isArray(list) ? list : []).map((c: any) =>
+      commitOf({ sha: c.sha, full: [c.message, c.body].filter(Boolean).join('\n\n'), author: c.author, actorName: c.author, date: c.date }),
+    )
   }
   async latest() {
     return null
@@ -92,18 +162,24 @@ export class LocalSource implements Source {
 
 export type GhConfig = { owner: string; repo: string; branch: string; token: string }
 
-const toCommit = (c: any): Commit => ({
-  sha: c.sha,
-  message: String(c.commit.message).split('\n')[0],
-  author: c.author?.login || c.commit.author?.name || '?',
-  avatar: c.author?.avatar_url,
-  date: c.commit.author?.date,
-})
+/** A REST commit → Commit. Keeps the whole message, so the body (and the Claude trailer in it) is not lost. */
+export const toCommit = (c: any): Commit =>
+  commitOf({
+    sha: c.sha,
+    full: String(c.commit?.message ?? ''),
+    author: c.author?.login || c.commit?.author?.name || '?',
+    actorName: c.commit?.author?.name,
+    avatar: c.author?.avatar_url,
+    date: c.commit?.author?.date,
+  })
 
 export class GitHubSource implements Source {
   kind = 'github' as const
   private sync: RepoSync
-  constructor(private c: GhConfig) {
+  // A plain field (no constructor parameter property), so Node can load this file by type stripping (tests).
+  private c: GhConfig
+  constructor(c: GhConfig) {
+    this.c = c
     this.sync = new RepoSync((p, init) => this.api(p, init), c.owner, c.repo, c.branch)
   }
   get label() {
@@ -158,6 +234,11 @@ export class GitHubSource implements Source {
 
   write(path: string, text: string, message: string) {
     return this.sync.write(path, text, message)
+  }
+
+  /** Reads from the sync cache (0 extra calls); a stale cache shows up as StaleWriteError, which re-syncs it. */
+  update(path: string, fn: UpdateFn, message: string) {
+    return updateLoop(() => this.sync.cached(path) ?? null, (next) => this.sync.write(path, next, message), fn, 3, path)
   }
 
   async me() {

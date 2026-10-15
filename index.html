@@ -2,23 +2,68 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="robots" content="noindex, nofollow" />
+    <meta name="color-scheme" content="light dark" />
+    <!-- Defence in depth for rendered notes, posts and AI answers (lib/md-html.ts is the first layer): images only from
+         the app, data: URIs and GitHub avatars; no form posts; no <base>; no plugins. Scripts/styles are not restricted
+         here (the inline pre-paint script and the dev server's inline scripts must run). -->
+    <meta http-equiv="Content-Security-Policy" content="img-src 'self' data: https://avatars.githubusercontent.com; form-action 'none'; base-uri 'none'; object-src 'none'" />
     <title>HQ</title>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧭</text></svg>" />
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><rect width='24' height='24' rx='6' fill='%237c5cec'/><path d='M8 6v12M16 6v12M8 12h8' stroke='white' stroke-width='2.4' stroke-linecap='round'/></svg>" />
+    <script>
+      /* Pre-paint (runs before any CSS or React): read the enum-only look cache (hq.ui.<login>, login from hq.ui.@last),
+         keep only values from the enum lists below (anything else = default), resolve 'system', and set the data-*
+         attributes the CSS matches on. No flash of the wrong theme, no text-size jump. Migrates the v2 'hq.theme' once
+         and drops 'hq.design'. The enum lists are plain JSON between the markers (E's prepaint-parity test reads them). */
+      (function () {
+        var r = document.documentElement
+        try {
+          var E = /*HQ_ENUM*/{"theme":["system","light","dark"],"accent":["violet","blue","green","amber","rose","slate"],"density":["compact","comfy","spacious"],"size":["s","m","l","xl","xxl"],"font":["inter","lexend","atkinson","system"],"lh":["normal","relaxed","loose"],"ls":["normal","wide"],"motion":["system","reduced","full"],"contrast":["normal","high"],"calm":["off","on"],"focus":["off","on"],"keys":["on","off"]}/*HQ_ENUM_END*/
+          var D = { theme: 'system', accent: 'violet', density: 'comfy', size: 'm', font: 'inter', lh: 'normal', ls: 'normal', motion: 'system', contrast: 'normal', calm: 'off', focus: 'off', keys: 'on' }
+          var S = window.localStorage
+          var J = function (k) { try { var v = S.getItem(k); return v == null ? null : JSON.parse(v) } catch (e) { return null } }
+          var who = J('hq.ui.@last')
+          if (typeof who !== 'string' || !/^[\w@.-]{1,40}$/.test(who)) who = '@local'
+          var key = 'hq.ui.' + who.toLowerCase()
+          var c = J(key)
+          if (!c || typeof c !== 'object' || Array.isArray(c)) c = {}
+          var old = J('hq.theme')
+          if (old != null) {
+            if (!c.theme && (old === 'light' || old === 'dark')) {
+              c.theme = old
+              try { S.setItem(key, JSON.stringify(c)); S.setItem('hq.ui.@last', JSON.stringify(who)) } catch (e) {}
+            }
+            try { S.removeItem('hq.theme') } catch (e) {}
+          }
+          try { S.removeItem('hq.design') } catch (e) {}
+          var p = {}
+          for (var k in E) { var v = c[k]; p[k] = typeof v === 'string' && E[k].indexOf(v) >= 0 ? v : D[k] }
+          var mq = window.matchMedia ? matchMedia('(prefers-color-scheme: dark)') : null
+          r.setAttribute('data-theme', p.theme === 'dark' || (p.theme === 'system' && !!(mq && mq.matches)) ? 'dark' : 'light')
+          r.setAttribute('data-theme-pref', p.theme)
+          var A = ['accent', 'density', 'size', 'font', 'lh', 'ls', 'contrast', 'calm', 'focus']
+          for (var i = 0; i < A.length; i++) if (p[A[i]] !== D[A[i]]) r.setAttribute('data-' + A[i], p[A[i]])
+          if (p.motion !== 'system') r.setAttribute('data-motion', p.motion)
+          if (p.focus === 'on' || J('hq.sb.rail') === true) r.setAttribute('data-sb', 'rail')
+          var F = { lexend: 'Lexend:wght@400..700', atkinson: 'Atkinson+Hyperlegible:wght@400;700' }
+          if (F[p.font]) {
+            var l = document.createElement('link')
+            l.id = 'font-' + p.font
+            l.rel = 'stylesheet'
+            l.href = 'https://fonts.googleapis.com/css2?family=' + F[p.font] + '&display=swap'
+            document.head.appendChild(l)
+          }
+          if (mq && mq.addEventListener)
+            mq.addEventListener('change', function (e) { if (r.getAttribute('data-theme-pref') === 'system') r.setAttribute('data-theme', e.matches ? 'dark' : 'light') })
+        } catch (e) {
+          r.setAttribute('data-theme', 'light')
+        }
+      })()
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Alexandria:wght@400..800&family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Changa:wght@400..800&family=Geist:wght@400..700&family=Inter:opsz,wght@14..32,400..800&family=Readex+Pro:wght@300..700&family=Rubik:wght@400..700&display=swap" />
-    <script>
-      try {
-        var t = localStorage.getItem('hq.theme'); t = t ? JSON.parse(t) : null
-        document.documentElement.dataset.theme = t || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
-      } catch (e) { document.documentElement.dataset.theme = 'light' }
-      try {
-        var d = localStorage.getItem('hq.design'); d = d ? JSON.parse(d) : null
-        document.documentElement.dataset.design = d || 'obsidian'
-      } catch (e) { document.documentElement.dataset.design = 'obsidian' }
-    </script>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400..800&display=swap" />
   </head>
   <body>
     <div id="root"></div>

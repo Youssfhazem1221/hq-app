@@ -1,74 +1,55 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import { Cloud, Compass, LoaderCircle, Monitor, Moon, RefreshCw, Sun, TriangleAlert } from 'lucide-react'
-import { GitHubSource, LocalSource, type FileEntry, type GhConfig, type Me, type Source } from './lib/source'
-import { buildModel, displayName, type Model } from './lib/hq'
-import { Doorbell } from './lib/doorbell'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import type { FileEntry, GhConfig, Me, Source } from './lib/source'
+import { buildModel, displayName } from './lib/hq'
+import { humanChange } from './lib/changes'
+import type { Doorbell } from './lib/doorbell'
+import { slugOf, zonedParts } from './lib/people-core'
 import { SUPABASE_REF } from './config'
 import { same, store } from './lib/util'
-import { useRoute } from './lib/router'
-import { DEFAULT_DESIGN, isDesign, type DesignId } from './designs'
-import { NAV } from './nav'
-import { Avatar } from './components/ui'
-import { Toasts, toast } from './components/toast'
-import Dashboard from './pages/Dashboard'
-import Board from './pages/Board'
-import Todos from './pages/Todos'
-import Docs from './pages/Docs'
-import People from './pages/People'
-import Ask from './pages/Ask'
-import Settings from './pages/Settings'
-import DesignLab from './pages/DesignLab'
-import Projects from './pages/Projects'
+import { docTitle, go, parseRoute, useRoute } from './lib/router'
+import { HQ_EVENTS, fire, type Route } from './lib/contracts'
+import { HQContext, PrefsContext, RouteContext, useHQMaybe, type HQCtx } from './lib/hq-context'
+import { usePrefs } from './lib/prefs'
+import { focusPageTitle, isTyping, onEscape, rememberFocus, restoreFocus, runEscape, setPaletteReturn } from './lib/focus'
+import { Icon } from './lib/icons'
+import { Toasts, openCheckin, toast } from './components/toast'
+import { Boundary, PageSnag } from './components/ErrorBoundary'
+import { Sidebar, type PeopleBadge } from './components/shell/Sidebar'
+import { TopBar } from './components/shell/TopBar'
+import { BottomBar } from './components/shell/BottomBar'
+import { TipLayer } from './components/shell/Popover'
+import { crumbsFor, keyAction } from './components/shell/shell-core'
+import { PageView } from './routes'
 
-type Ctx = {
-  source: Source
-  model: Model
-  me: Me
-  /** Full reload with the busy spinner (after the user's own writes). */
-  reload: () => Promise<void>
-  /** Quiet change check: free when nothing changed; rebuilds the model and toasts when files did. */
-  refresh: () => Promise<void>
-  busy: boolean
-  loadedAt: number
-  /** Realtime doorbell (push + Claude bridge hints); null until the source is ready. */
-  bell: Doorbell | null
-}
-const HQ = createContext<Ctx | null>(null)
-export function useHQ() {
-  const c = useContext(HQ)
-  if (!c) throw new Error('HQ context missing')
-  return c
-}
-
-export type Theme = 'light' | 'dark'
+// App-wide surfaces that listen for shell events (each in its own lazy chunk, mounted once right after the first
+// paint): the Adjust look drawer (hq:adjust-look + the palette's Look items), the check-in sheet (hq:checkin) and the
+// For-you toasts + People nav badge, which watch every model rebuild (local and GitHub mode alike).
+const loadPalette = () => import('./components/shell/Palette')
+const Palette = lazy(() => loadPalette().then((m) => ({ default: m.Palette })))
+const AdjustLook = lazy(() => import('./components/AdjustLook'))
+const CheckInSheet = lazy(() => import('./components/people/CheckIn'))
+const ForYouWatch = lazy(() =>
+  import('./lib/foryou-toasts').then((m) => ({
+    default: function ForYouWatch({ onBadge }: { onBadge: (b: PeopleBadge) => void }) {
+      const hq = useHQMaybe()
+      const model = hq?.model || null
+      const me = hq?.me || null
+      m.useForYouToasts(model, me)
+      useEffect(() => {
+        onBadge(model && me ? m.peopleNavBadge(model, me.login) : { count: 0, quiet: false })
+      }, [model, me, onBadge])
+      return null
+    },
+  })),
+)
 
 const CHECK_EVERY_MS = 60_000
 const PUSH_DEBOUNCE_MS = 500
+const RAIL_KEY = 'hq.sb.rail'
 
-function useLook() {
-  const [theme, setThemeState] = useState<Theme>(() => (document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light'))
-  const [design, setDesignState] = useState<DesignId>(() => {
-    const d = store.get<string>('hq.design', DEFAULT_DESIGN)
-    return isDesign(d) ? d : DEFAULT_DESIGN
-  })
-  useEffect(() => {
-    document.documentElement.dataset.theme = theme
-  }, [theme])
-  useEffect(() => {
-    document.documentElement.dataset.design = design
-  }, [design])
-  const setTheme = (t: Theme) => {
-    store.set('hq.theme', t)
-    setThemeState(t)
-  }
-  const setDesign = (d: DesignId) => {
-    store.set('hq.design', d)
-    setDesignState(d)
-  }
-  return { theme, setTheme, design, setDesign }
-}
-
+// The sources (and the GitHub sync) load on demand so the first paint stays small (spec §9 entry budget).
 async function pickSource(): Promise<Source | null> {
+  const { GitHubSource, LocalSource } = await import('./lib/source')
   const mode = store.get<string | null>('hq.mode', null)
   const gh = store.get<GhConfig | null>('hq.github', null)
   if (mode !== 'github' && import.meta.env.DEV) {
@@ -79,6 +60,22 @@ async function pickSource(): Promise<Source | null> {
   return gh?.token ? new GitHubSource(gh) : null
 }
 
+/** Focus the page title once the (lazy) page has rendered it. */
+function focusTitleSoon() {
+  if (focusPageTitle()) return
+  const main = document.getElementById('main')
+  if (!main) return
+  const obs = new MutationObserver(() => {
+    if (focusPageTitle()) obs.disconnect()
+  })
+  obs.observe(main, { childList: true, subtree: true })
+  // A page without an h1 (old pages): land in <main> so the next Tab starts in the content.
+  setTimeout(() => {
+    obs.disconnect()
+    if (!focusPageTitle() && (!document.activeElement || document.activeElement === document.body)) main.focus({ preventScroll: true })
+  }, 1500)
+}
+
 export default function App() {
   const [source, setSource] = useState<Source | null | undefined>(undefined)
   const [files, setFiles] = useState<FileEntry[] | null>(null)
@@ -87,9 +84,14 @@ export default function App() {
   const [busy, setBusy] = useState(false)
   const [loadedAt, setLoadedAt] = useState(0)
   const [bell, setBell] = useState<Doorbell | null>(null)
-  const look = useLook()
-  const route = useRoute()
-  const toggleTheme = () => look.setTheme(look.theme === 'dark' ? 'light' : 'dark')
+  const [palette, setPalette] = useState(false)
+  const [paletteUsed, setPaletteUsed] = useState(false)
+  const [sheet, setSheet] = useState(false)
+  const [railStored, setRailStored] = useState(() => store.get<boolean>(RAIL_KEY, false))
+  const [remount, setRemount] = useState(0)
+  const raw = useRoute()
+  const route: Route = useMemo(() => parseRoute(raw), [raw])
+  const [peopleBadge, setPeopleBadge] = useState<PeopleBadge>({ count: 0, quiet: false })
 
   useEffect(() => {
     pickSource().then(setSource)
@@ -113,17 +115,23 @@ export default function App() {
     }
   }, [source])
 
-  // Doorbell: topic from .hq/realtime.json (only if it names this Supabase project).
+  // Doorbell: topic from .hq/realtime.json (only if it names this Supabase project). Loaded on demand.
   useEffect(() => {
     if (!source) return
-    const b = new Doorbell(async () => {
-      const rt = await source.realtime()
-      return rt && (!rt.project || rt.project === SUPABASE_REF) ? rt.topic : null
+    let off = false
+    let b: Doorbell | null = null
+    import('./lib/doorbell').then(({ Doorbell }) => {
+      if (off) return
+      b = new Doorbell(async () => {
+        const rt = await source.realtime()
+        return rt && (!rt.project || rt.project === SUPABASE_REF) ? rt.topic : null
+      })
+      b.start()
+      setBell(b)
     })
-    b.start()
-    setBell(b)
     return () => {
-      b.stop()
+      off = true
+      b?.stop()
       setBell(null)
     }
   }, [source])
@@ -146,6 +154,15 @@ export default function App() {
   const modelRef = useRef(model)
   modelRef.current = model
 
+  // Look prefs: the device cache (read by the pre-paint) + people/<slug>/ui.md, re-read on every refresh (spec §7.2).
+  const mySlug = useMemo(() => (model && me ? model.roster.find((p) => same(p.login, me.login))?.slug || slugOf(me.login) : null), [model, me])
+  // Local mode without HQ_LOCAL_LOGIN (me.configured === false): "me" is only a display default, so the look stays on
+  // this device (cache only) and never lands in someone else's people/<slug>/ui.md.
+  const readOnlyMe = me?.configured === false
+  const prefsApi = usePrefs(me && !readOnlyMe ? me.login : null, { source: source || null, files, slug: readOnlyMe ? null : mySlug })
+  const { prefs } = prefsApi
+  const rail = railStored || prefs.focus === 'on'
+
   // Quiet change check. One at a time; a call that lands mid-check runs one more pass after it.
   const running = useRef<Promise<void> | null>(null)
   const again = useRef(false)
@@ -166,7 +183,8 @@ export default function App() {
       if (source.kind === 'local') return toast('Files changed on this PC', 'local')
       const c = await source.latest().catch(() => null)
       const m = modelRef.current
-      if (c) toast(`${m ? displayName(m, c.author) : c.author}: ${c.message}`, 'commit')
+      // human words, never the raw commit subject (no tool prefixes or file ids)
+      if (c) toast(humanChange(c, (l) => (m ? displayName(m, l) : l)), 'commit')
     }
     running.current = (async () => {
       do {
@@ -228,100 +246,271 @@ export default function App() {
     }
   }, [bell, source, ready, refresh])
 
-  const section = '/' + (route.split('/')[1] || '')
-  const [, NavIcon, navLabel] = source === null ? NAV.find(([r]) => r === '/settings')! : NAV.find(([r]) => r === section) || NAV[0]
+  // ---- shell state on <html>: rail sidebar, phone sheet ----
+  useEffect(() => {
+    document.documentElement.setAttribute('data-sb', rail ? 'rail' : 'full')
+  }, [rail])
+  useEffect(() => {
+    const r = document.documentElement
+    if (sheet) r.setAttribute('data-sheet', 'nav')
+    else r.removeAttribute('data-sheet')
+  }, [sheet])
 
-  const counts: Record<string, number> = {}
-  if (model && me) {
-    counts['/board'] = model.board.filter((b) => b.data.for_claude && b.data.status !== 'done').length
-    counts['/todos'] = model.todos.filter((t) => t.data.status !== 'done' && same(t.data.owner, me.login)).length
-    counts['/ask'] = model.requests.filter((r) => !model.answers.has(String(r.data.id))).length
+  const toggleRail = useCallback(() => {
+    setRailStored((v) => {
+      store.set(RAIL_KEY, !v)
+      return !v
+    })
+  }, [])
+  const openSheet = useCallback(() => {
+    rememberFocus()
+    setSheet(true)
+    setTimeout(() => document.getElementById('sb-ci')?.focus(), 60)
+  }, [])
+  const closeSheet = useCallback((restore = true) => {
+    setSheet((was) => {
+      if (was && restore) setTimeout(restoreFocus, 0)
+      return false
+    })
+  }, [])
+  useEffect(() => {
+    if (!sheet) return
+    // The phone sheet joins the Esc stack like any other surface.
+    return onEscape(() => closeSheet())
+  }, [sheet, closeSheet])
+
+  const openPalette = useCallback(() => {
+    const a = document.activeElement
+    setPaletteReturn(a)
+    rememberFocus()
+    setSheet(false)
+    setPaletteUsed(true)
+    setPalette(true)
+  }, [])
+  // The palette is its own chunk: fetch it once the first screen is up, so Ctrl K opens without a wait.
+  useEffect(() => {
+    const t = setTimeout(() => void loadPalette().catch(() => {}), 1200)
+    return () => clearTimeout(t)
+  }, [])
+  const closePalette = useCallback(() => setPalette(false), [])
+
+  const checkin = useCallback(() => {
+    setSheet(false)
+    // The sheet mounts right after the first paint (and once a workspace is open); this covers the moment before.
+    openCheckin({}, source !== null)
+  }, [source])
+  const adjustLook = useCallback((query?: string) => {
+    setSheet(false)
+    if (!fire(HQ_EVENTS.adjustLook, query ? { query } : {})) go('/settings')
+  }, [])
+
+  // ---- keyboard (spec §2.4) ----
+  const gPending = useRef(false)
+  const gTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  const routeRef = useRef(route)
+  routeRef.current = route
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const a = keyAction(e, { keys: prefs.keys, typing: isTyping(e.target), gPending: gPending.current })
+      if (!a) return
+      switch (a.type) {
+        case 'palette':
+          e.preventDefault()
+          if (palette) {
+            setPalette(false)
+            restoreFocus()
+          } else openPalette()
+          return
+        case 'adjust':
+          e.preventDefault()
+          setPalette(false)
+          adjustLook()
+          return
+        case 'rail':
+          e.preventDefault()
+          toggleRail()
+          return
+        case 'escape':
+          runEscape()
+          return
+        case 'g':
+          gPending.current = true
+          clearTimeout(gTimer.current)
+          gTimer.current = setTimeout(() => (gPending.current = false), 900)
+          return
+        case 'gcancel':
+          gPending.current = false
+          return
+        case 'go':
+          gPending.current = false
+          e.preventDefault()
+          go(a.to)
+          return
+        case 'checkin':
+          e.preventDefault()
+          rememberFocus()
+          checkin()
+          return
+        case 'new':
+          if (fire(HQ_EVENTS.newItem, { page: routeRef.current.page })) e.preventDefault()
+          return
+        case 'tick': {
+          const t = e.target as HTMLElement | null
+          if (t?.matches?.('.cbx,[data-tick]')) {
+            e.preventDefault()
+            t.click()
+          }
+          return
+        }
+        case 'help':
+          e.preventDefault()
+          go('/settings')
+          setTimeout(() => document.getElementById('s-shortcuts')?.scrollIntoView({ block: 'start' }), 400)
+          return
+      }
+    }
+    addEventListener('keydown', onKey)
+    return () => removeEventListener('keydown', onKey)
+  }, [prefs.keys, palette, openPalette, adjustLook, toggleRail, checkin])
+
+  // ---- route changes: close the sheet, scroll top, focus the h1 (no ring), tab title ----
+  const first = useRef(true)
+  useEffect(() => {
+    if (first.current) {
+      first.current = false
+      return
+    }
+    setSheet(false)
+    scrollTo(0, 0)
+    focusTitleSoon()
+  }, [route.path])
+  const crumbs = useMemo(() => crumbsFor(route, model), [route, model])
+  useEffect(() => {
+    document.title = docTitle(source === null ? 'Settings' : crumbs[crumbs.length - 1]?.label || '')
+  }, [crumbs, source])
+
+  // #/me → my own page once the workspace knows who I am.
+  useEffect(() => {
+    if (route.person !== '@me' || !model || !me) return
+    const slug = model.roster.find((p) => same(p.login, me.login))?.slug
+    location.replace('#/people/' + (slug || ''))
+  }, [route.person, model, me])
+
+  // Ask from anywhere while already on Ask: remount the page so it reads the prefill.
+  useEffect(() => {
+    const f = () => setRemount((n) => n + 1)
+    addEventListener('hq:remount', f)
+    return () => removeEventListener('hq:remount', f)
+  }, [])
+
+  const loggedToday = useMemo(() => {
+    if (!model || !me) return false
+    const p = model.roster.find((x) => same(x.login, me.login))
+    if (!p) return false
+    try {
+      const today = zonedParts(new Date().toISOString(), p.timezone || 'UTC').date
+      return (model.logEntries.get(p.slug) || []).some((r) => r.date === today)
+    } catch {
+      return false
+    }
+  }, [model, me, loadedAt])
+
+  const ctx: HQCtx | null = source && model && me ? { source, model, me, reload, refresh, busy, loadedAt, bell } : null
+  const settingsProps = {
+    source: source || null,
+    onConnect: (s: Source | null) => setSource(s),
   }
-
-  const settings = <Settings source={source || null} onConnect={(s) => setSource(s)} theme={look.theme} toggleTheme={toggleTheme} />
+  const settingsRoute: Route = { page: 'Settings', nav: 'settings', path: '/settings' }
 
   let content: React.ReactNode
-  if (source === undefined) content = <div className="splash"><LoaderCircle className="i spin" /> Starting…</div>
-  else if (source === null || section === '/settings') content = settings
-  else if (error && !model) content = <div className="alert"><TriangleAlert className="i" /> {error} · <a href="#/settings">Open Settings</a></div>
-  else if (!model || !me) content = <div className="splash"><LoaderCircle className="i spin" /> Loading your workspace…</div>
-  else {
-    const pages: Record<string, React.ReactNode> = {
-      '/': <Dashboard />,
-      '/projects': <Projects slug={route.slice('/projects/'.length)} />,
-      '/board': <Board />,
-      '/todos': <Todos />,
-      '/docs': <Docs path={route.slice('/docs/'.length)} />,
-      '/people': <People />,
-      '/ask': <Ask />,
-      '/design': <DesignLab design={look.design} setDesign={look.setDesign} theme={look.theme} setTheme={look.setTheme} />,
-    }
-    content = <HQ.Provider value={{ source, model, me, reload, refresh, busy, loadedAt, bell }}>{pages[section] || <Dashboard />}</HQ.Provider>
+  if (source === undefined) content = <Splash text="Starting…" />
+  else if (source === null) content = <PageView route={settingsRoute} extra={settingsProps} />
+  else if (route.page === 'Settings') content = <PageView route={route} extra={settingsProps} />
+  else if (error && !model)
+    content = (
+      <div className="alert" role="alert">
+        <Icon name="alert" /> {error} · <a href="#/settings">Open Settings</a>
+      </div>
+    )
+  else if (!ctx) content = <Splash text="Loading your workspace…" />
+  else content = <PageView route={route} extra={settingsProps} />
+
+  const skip = (e: React.MouseEvent) => {
+    e.preventDefault()
+    if (!focusPageTitle()) document.getElementById('main')?.focus()
   }
 
   return (
-    <div className="shell app-shell">
-      <nav className="nav">
-        <a className="brand" href="#/">
-          <Compass className="i lg" /> <b>HQ</b>
-        </a>
-        {NAV.map(([r, Icon, label]) => (
-          <a key={r} href={'#' + r} className={'nav-link' + (section === r ? ' on' : '')} title={label}>
-            <span className="ico"><Icon className="i" /></span>
-            <span className="lbl">{label}</span>
-            {counts[r] ? <span className="count">{counts[r]}</span> : null}
+    <RouteContext.Provider value={source === null ? settingsRoute : route}>
+      <PrefsContext.Provider value={prefsApi}>
+        <HQContext.Provider value={ctx}>
+          <a className="skip" href="#main" onClick={skip}>
+            Skip to content
           </a>
-        ))}
-        <div className="nav-foot">
-          {me && (
-            <div className="me" title={me.login}>
-              <Avatar name={me.name} src={me.avatar} size={28} />
-              <span className="lbl">{me.name}</span>
+          <div className="app">
+            <Sidebar route={source === null ? settingsRoute : route} loggedToday={loggedToday} peopleBadge={peopleBadge} onPalette={openPalette} onRail={toggleRail} onCheckin={checkin} />
+            <div className="sb-scrim" onClick={() => closeSheet()} aria-hidden="true" />
+            <div className="main">
+              <TopBar
+                crumbs={crumbs}
+                rail={rail}
+                source={source}
+                bell={bell}
+                busy={busy}
+                error={error}
+                onReload={reload}
+                onMenu={openSheet}
+                onRail={toggleRail}
+                onPalette={openPalette}
+                onAdjust={() => adjustLook()}
+              />
+              {error && model && (
+                <div className="alert" role="alert">
+                  <Icon name="alert" /> {error}
+                </div>
+              )}
+              {readOnlyMe && (
+                <div className="alert warn" role="note">
+                  <Icon name="info" /> Viewing only: set HQ_LOCAL_LOGIN in .env.local to save check-ins, your profile and your look as yourself.
+                </div>
+              )}
+              <main id="main" tabIndex={-1}>
+                <div className="page" data-page={route.page} key={route.path + ':' + remount}>
+                  <Boundary resetKey={route.path + ':' + remount} fallback={(_e, reset) => <PageSnag reset={reset} />}>
+                    {content}
+                  </Boundary>
+                </div>
+              </main>
             </div>
-          )}
-        </div>
-      </nav>
-      <main className="main">
-        <header className="top">
-          <h1>
-            <NavIcon className="i" /> {navLabel}
-          </h1>
-          <div className="top-actions">
-            {source && (
-              <span className="pill hide-sm">
-                <LiveDot bell={bell} />
-                {source.kind === 'local' ? <Monitor className="i sm" /> : <Cloud className="i sm" />}
-                {source.kind === 'local' ? 'Local folder' : source.label}
-              </span>
-            )}
-            {source && (
-              <button className="btn ghost" onClick={reload} disabled={busy} title="Reload from the repo">
-                <RefreshCw className={'i' + (busy ? ' spin' : '')} /> <span className="hide-sm">Refresh</span>
-              </button>
-            )}
-            <button className="btn ghost" onClick={toggleTheme} title="Light / dark" aria-label="Toggle light or dark mode">
-              {look.theme === 'dark' ? <Sun className="i" /> : <Moon className="i" />}
-            </button>
           </div>
-        </header>
-        {error && model && <div className="alert"><TriangleAlert className="i" /> {error}</div>}
-        <div className="page">{content}</div>
-      </main>
-      <Toasts />
+          <BottomBar route={route} onMore={openSheet} />
+          {paletteUsed && (
+            <Boundary fallback={null}>
+              <Suspense fallback={null}>
+                <Palette open={palette} route={route} onClose={closePalette} onCheckin={checkin} onAdjust={adjustLook} />
+              </Suspense>
+            </Boundary>
+          )}
+          <Boundary fallback={null}>
+            <Suspense fallback={null}>
+              <AdjustLook />
+              {ctx && <CheckInSheet />}
+              {ctx && <ForYouWatch onBadge={setPeopleBadge} />}
+            </Suspense>
+          </Boundary>
+          <Toasts />
+          <TipLayer />
+        </HQContext.Provider>
+      </PrefsContext.Provider>
+    </RouteContext.Provider>
+  )
+}
+
+function Splash({ text }: { text: string }) {
+  return (
+    <div className="splash" role="status">
+      <Icon name="loader" className="spin" /> {text}
     </div>
   )
 }
 
-const noSub = () => () => {}
-/** Green when live updates (the doorbell) are connected; otherwise the app checks GitHub every minute. */
-function LiveDot({ bell }: { bell: Doorbell | null }) {
-  useSyncExternalStore(bell ? bell.subscribe : noSub, () => bell?.version ?? 0)
-  const live = bell?.status === 'live'
-  return (
-    <span
-      className={'live-dot' + (live ? ' on' : '')}
-      title={live ? 'Live updates on' : 'Live updates off: checking every minute'}
-      aria-label={live ? 'Live updates on' : 'Live updates off'}
-    />
-  )
-}

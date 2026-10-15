@@ -1,70 +1,193 @@
-import { useMemo, type ReactNode } from 'react'
+import { Fragment, useMemo, type ReactNode } from 'react'
 import { routeFor } from '../lib/hq'
-import { resolvePath, toHtml } from '../lib/md'
+import { resolvePath } from '../lib/md'
+import { toHtml } from '../lib/md-html'
 import { ago } from '../lib/util'
 import { go } from '../lib/router'
-import { Chart, parseChart, type ChartSpec } from './charts'
+import { Icon } from '../lib/icons'
+import type { BlockCtx, IconName, NextItem, TileSpec } from '../lib/contracts'
+import { initials, shownTiles } from './shell/shell-core'
+import { MenuButton, type MenuEntry } from './shell/Popover'
+import { BLOCKS, newBlockCtx, splitBlocks } from './blocks'
 
-export function Card(p: { icon?: ReactNode; title?: ReactNode; extra?: ReactNode; children: ReactNode; className?: string }) {
+// ---------------------------------------------------------------------------------------------------------------
+// v3 building blocks (spec §4). Class names match mock/src/styles.css; styles live in styles/components.css.
+// ---------------------------------------------------------------------------------------------------------------
+
+/** Widget card: icon · title · count · actions · ⋯ menu. `secondary` widgets hide in Focus mode. */
+export function Widget(p: {
+  id: string
+  title: string
+  icon?: IconName
+  count?: number | null
+  chip?: ReactNode
+  act?: ReactNode
+  menu?: MenuEntry[]
+  secondary?: boolean
+  flat?: boolean
+  className?: string
+  children: ReactNode
+}) {
   return (
-    <section className={'card ' + (p.className || '')}>
-      {(p.title || p.extra) && (
-        <div className="card-h">
-          <h3>
-            {p.icon}
-            {p.title}
-          </h3>
-          {p.extra}
-        </div>
-      )}
-      {p.children}
+    <section
+      className={'w' + (p.flat ? ' flat' : '') + (p.className ? ' ' + p.className : '')}
+      data-w={p.id}
+      data-secondary={p.secondary ? '' : undefined}
+      aria-labelledby={'w-' + p.id}
+    >
+      <div className="wh">
+        <h2 id={'w-' + p.id}>
+          {p.icon && <Icon name={p.icon} />}
+          <span>{p.title}</span>
+          {p.count != null && <span className="count">{p.count}</span>}
+          {p.chip}
+        </h2>
+        {(p.act || p.menu?.length) && (
+          <div className="act">
+            {p.act}
+            {p.menu && <MenuButton label={'Options: ' + p.title} items={p.menu} />}
+          </div>
+        )}
+      </div>
+      <div className="wbody">{p.children}</div>
     </section>
   )
 }
 
-export function Tile(p: { icon: ReactNode; label: string; value: ReactNode; tone?: string; href?: string }) {
+/** One header tile. Renders nothing for a dropped tile (null, false, empty or zero: tiles never show 0). */
+export function Stat({ tile }: { tile: TileSpec }) {
+  if (!shownTiles([tile]).length || !tile) return null
   return (
-    <a className={`tile tone-${p.tone || 'accent'}`} href={p.href || '#/'}>
-      <span className="tile-ico">{p.icon}</span>
-      <span className="tile-v">{p.value}</span>
-      <span className="tile-l">{p.label}</span>
-    </a>
+    <div className="stat">
+      <b>
+        {tile.value}
+        {tile.delta && <span className={'delta' + (tile.delta.good ? '' : ' bad')}>{tile.delta.text}</span>}
+      </b>
+      <span>
+        {tile.label}
+        {tile.sample && <em className="sample-tag" data-tipt="Illustrative data: nothing logged yet"> · sample</em>}
+      </span>
+    </div>
   )
 }
 
-const TONES: Record<string, string> = {
-  active: 'info', open: 'info', waiting: 'warn', doing: 'warn', todo: 'muted', done: 'ok', parked: 'muted', error: 'bad',
-  idea: 'accent', thought: 'info', question: 'warn', update: 'ok',
-}
-export const toneOf = (s?: unknown) => TONES[String(s || '').toLowerCase()] || 'muted'
-
-export function Badge(p: { tone?: string; children: ReactNode; title?: string }) {
+const STATUS_IC: Record<string, IconName> = { active: 'zap', waiting: 'clock', parked: 'pause', done: 'check' }
+/** Project / item status: icon + word, never colour alone. */
+export function StatusPill({ status }: { status?: unknown }) {
+  const s = String(status || '').toLowerCase()
+  if (!s) return null
   return (
-    <span className={`badge tone-${p.tone || 'muted'}`} title={p.title}>
-      {p.children}
+    <span className={'st ' + (STATUS_IC[s] ? s : 'other')}>
+      <Icon name={STATUS_IC[s] || 'info'} />
+      {s}
     </span>
   )
 }
 
-export function Empty(p: { icon: ReactNode; text: ReactNode; children?: ReactNode }) {
+/** On/off switch (role=switch). */
+export function Switch({ on, onChange, label, disabled }: { on: boolean; onChange: (v: boolean) => void; label: string; disabled?: boolean }) {
+  return <button className="sw" type="button" role="switch" aria-checked={on} aria-label={label} disabled={disabled} onClick={() => onChange(!on)} />
+}
+
+/** Notion-style callout. */
+export function Callout({ icon = 'info', children }: { icon?: IconName; children: ReactNode }) {
+  return (
+    <div className="callout">
+      <Icon name={icon} />
+      <span>{children}</span>
+    </div>
+  )
+}
+
+/** Notion-style toggle (details/summary). */
+export function Toggle({ title, open, children, className }: { title: ReactNode; open?: boolean; children: ReactNode; className?: string }) {
+  return (
+    <details className={'tg' + (className ? ' ' + className : '')} open={open}>
+      <summary>
+        <Icon name="chevR" size="s" className="chev" />
+        {title}
+      </summary>
+      <div className="tg-body">{children}</div>
+    </details>
+  )
+}
+
+/** Small chip. With `pressed` it becomes a toggle chip (aria-pressed); with `onClick` a button. */
+export function Chip(p: {
+  tone?: 'ok' | 'warn' | 'bad' | 'acc' | 'line' | 'sample'
+  icon?: IconName
+  pressed?: boolean
+  onClick?: () => void
+  title?: string
+  children: ReactNode
+}) {
+  const body = (
+    <>
+      {p.icon && <Icon name={p.icon} />}
+      {p.children}
+    </>
+  )
+  if (p.pressed !== undefined)
+    return (
+      <button className="qchip" type="button" aria-pressed={p.pressed} onClick={p.onClick} title={p.title}>
+        {body}
+      </button>
+    )
+  const cls = 'chip' + (p.tone ? ' ' + p.tone : '')
+  if (p.onClick)
+    return (
+      <button className={cls} type="button" onClick={p.onClick} title={p.title}>
+        {body}
+      </button>
+    )
+  return (
+    <span className={cls} title={p.title}>
+      {body}
+    </span>
+  )
+}
+
+/** Empty state: one sentence + at most one button. `icon` = an icon name (or a node). */
+export function Empty(p: { icon: IconName | ReactNode; text: ReactNode; children?: ReactNode }) {
   return (
     <div className="empty">
-      {p.icon}
-      <div>{p.text}</div>
+      {typeof p.icon === 'string' ? <Icon name={p.icon} /> : p.icon}
+      <p>{p.text}</p>
       {p.children}
     </div>
   )
 }
 
-const hue = (s: string) => [...s].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 360, 7)
-export function Avatar(p: { name: string; src?: string; size?: number }) {
-  const size = p.size || 32
-  const initials = String(p.name || '?').split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase()
-  if (p.src) return <img className="avatar" src={p.src} width={size} height={size} alt="" />
+export { initials }
+
+/** Person avatar: initials on the accent wash (fixes the old "Y(" initials), Claude = bot icon, or a picture. */
+export function Avatar(p: { name: string; src?: string; size?: number; bot?: boolean }) {
+  const size = p.size || 28
+  const style = { width: size, height: size, fontSize: Math.round(size * 0.4) }
+  if (p.src) return <img className="av" src={p.src} width={size} height={size} style={style} alt="" />
+  if (p.bot)
+    return (
+      <span className="av bot" style={style} role="img" aria-label={p.name}>
+        <Icon name="bot" />
+      </span>
+    )
   return (
-    <span className="avatar" style={{ width: size, height: size, fontSize: size * 0.4, background: `hsl(${hue(p.name || '?')} 55% 42%)` }}>
-      {initials}
+    <span className="av" style={style} role="img" aria-label={p.name}>
+      {initials(p.name)}
     </span>
+  )
+}
+
+/** Segmented control (aria-pressed buttons). */
+export function Segmented<T extends string>(p: { value: T; options: [T, ReactNode][]; onChange: (v: T) => void; label?: string }) {
+  return (
+    <div className="seg" role="group" aria-label={p.label}>
+      {p.options.map(([v, label]) => (
+        <button key={v} type="button" className={v === p.value ? 'on' : ''} aria-pressed={v === p.value} onClick={() => p.onChange(v)}>
+          {label}
+        </button>
+      ))}
+    </div>
   )
 }
 
@@ -74,33 +197,26 @@ export const Ago = ({ iso }: { iso?: unknown }) => (
   </span>
 )
 
-/** Rendered markdown; relative .md links open inside the app. */
-/** AI answers cite files like [projects/linkedin/project.md] or [a.md, b.md]: turn them into links. */
+// ---------------------------------------------------------------------------------------------------------------
+// Markdown with rich blocks (spec §5.1): ```chart and ```explainer through B's BLOCKS. One BlockCtx per render (≤4
+// rich blocks per doc or answer; the 5th shows as code); every drawn block sits in a Boundary whose fallback is its code.
+// ---------------------------------------------------------------------------------------------------------------
+
+/** AI answers cite files like [projects/x/project.md] or [a.md, b.md]: turn them into links. */
 const linkCitations = (md: string) =>
   md.replace(/\[((?:[\w./-]+\.md)(?:,\s*[\w./-]+\.md)*)\](?!\()/g, (_, list: string) =>
     list.split(/,\s*/).map((p) => `[${p}](/${p})`).join(', '),
   )
 
-const CHART_BLOCK = /```chart[^\n]*\n([\s\S]*?)```/g
-
-/** Markdown with ```chart blocks drawn as interactive charts (bad JSON falls back to the code block). */
-export function Markdown({ md, base = '' }: { md: string; base?: string }) {
-  const parts = useMemo(() => {
-    const out: ({ kind: 'md'; text: string } | { kind: 'chart'; spec: ChartSpec })[] = []
-    let last = 0
-    for (const m of md.matchAll(CHART_BLOCK)) {
-      out.push({ kind: 'md', text: md.slice(last, m.index) })
-      const spec = parseChart(m[1])
-      out.push(spec ? { kind: 'chart', spec } : { kind: 'md', text: m[0] })
-      last = (m.index || 0) + m[0].length
-    }
-    out.push({ kind: 'md', text: md.slice(last) })
-    return out.filter((p) => p.kind === 'chart' || p.text.trim())
-  }, [md])
-  if (parts.length <= 1 && parts[0]?.kind !== 'chart') return <MarkdownText md={md} base={base} />
+/** Rendered markdown; relative .md links open inside the app. Rich blocks count against `ctx` (a fresh one per render
+ *  when the caller passes none, so re-renders never use up the budget). */
+export function Markdown({ md, base = '', ctx, decide }: { md: string; base?: string; ctx?: BlockCtx; decide?: NextItem | null }) {
+  const parts = useMemo(() => splitBlocks(md || ''), [md])
+  if (!parts.some((p) => p.kind !== 'md')) return <MarkdownText md={md} base={base} />
+  const c = ctx ?? newBlockCtx(base || undefined, decide)
   return (
     <div className="md-rich">
-      {parts.map((p, i) => (p.kind === 'chart' ? <Chart key={i} spec={p.spec} /> : <MarkdownText key={i} md={p.text} base={base} />))}
+      {parts.map((p, i) => (p.kind === 'md' ? <MarkdownText key={i} md={p.text} base={base} /> : <Fragment key={i}>{BLOCKS[p.kind](p.src, c)}</Fragment>))}
     </div>
   )
 }
@@ -124,16 +240,4 @@ function MarkdownText({ md, base = '' }: { md: string; base?: string }) {
     go(routeFor(target))
   }
   return <div className="md" onClick={onClick} dangerouslySetInnerHTML={{ __html: html }} />
-}
-
-export function Segmented<T extends string>(p: { value: T; options: [T, ReactNode][]; onChange: (v: T) => void }) {
-  return (
-    <div className="seg">
-      {p.options.map(([v, label]) => (
-        <button key={v} className={v === p.value ? 'on' : ''} onClick={() => p.onChange(v)}>
-          {label}
-        </button>
-      ))}
-    </div>
-  )
 }

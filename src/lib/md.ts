@@ -1,29 +1,25 @@
-import { marked } from 'marked'
-import DOMPurify from 'dompurify'
-import YAML from 'yaml'
+// Frontmatter + markdown text helpers (no rendering: markdown → HTML lives in md-html.ts).
+import { parse as parseYaml, stringify as stringifyYaml } from 'yaml'
 
 export type Doc = { path: string; data: Record<string, any>; body: string }
 
 const FM = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/
 
-/** Split a markdown file into frontmatter properties + body. */
+/** Split a markdown file into frontmatter properties + body. A leading byte-order mark (Windows editors, PowerShell
+ *  Set-Content) is ignored, as next-core, people-core, prefs and the dev server already do. */
 export function parse(path: string, raw: string): Doc {
-  const m = raw.match(FM)
-  if (!m) return { path, data: {}, body: raw }
+  const text = String(raw ?? '')
+  const src = text.charCodeAt(0) === 0xfeff ? text.slice(1) : text
+  const m = src.match(FM)
+  if (!m) return { path, data: {}, body: src }
   let data: Record<string, any> = {}
-  try { data = YAML.parse(m[1]) ?? {} } catch { data = {} }
-  return { path, data: typeof data === 'object' && data ? data : {}, body: raw.slice(m[0].length) }
+  try { data = parseYaml(m[1]) ?? {} } catch { data = {} }
+  return { path, data: typeof data === 'object' && data ? data : {}, body: src.slice(m[0].length) }
 }
 
 export function serialize(data: Record<string, unknown>, body: string) {
   const clean = Object.fromEntries(Object.entries(data).filter(([, v]) => v !== undefined))
-  return `---\n${YAML.stringify(clean, { lineWidth: 0 }).trimEnd()}\n---\n\n${String(body || '').trim()}\n`
-}
-
-marked.setOptions({ gfm: true, breaks: false })
-
-export function toHtml(md: string) {
-  return DOMPurify.sanitize(marked.parse(md || '', { async: false }) as string)
+  return `---\n${stringifyYaml(clean, { lineWidth: 0 }).trimEnd()}\n---\n\n${String(body || '').trim()}\n`
 }
 
 /** Body without its first "# Title" line (the page shows the title itself). */

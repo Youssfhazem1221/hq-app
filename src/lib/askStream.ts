@@ -3,8 +3,11 @@
 // Live answers sit in a small store outside React, so switching pages does not lose them.
 import { useSyncExternalStore } from 'react'
 import { AI_FUNCTION_URL } from '../config'
-import { askAi, type AskOptions } from './hq'
+import { askAi, displayName, projectSlug, type AskOptions, type Model } from './hq'
+import { serialize } from './md'
+import { explainerPath, firstLine } from './read-core'
 import { GitHubSource, type Me, type Source } from './source'
+import { nowIso, same } from './util'
 
 export type HistoryTurn = { q: string; a: string }
 export type SourceRef = { title?: string; url?: string; path?: string }
@@ -57,7 +60,7 @@ const subscribe = (cb: () => void) => {
   subs.add(cb)
   return () => void subs.delete(cb)
 }
-export const useLive = () => useSyncExternalStore(subscribe, () => lives)
+export const useLive = () => useSyncExternalStore(subscribe, () => lives, () => lives)
 export const liveList = () => lives
 export const liveBusy = () => lives.some((l) => l.state === 'streaming')
 
@@ -229,11 +232,64 @@ export function historyOf(turns: { question: string; answer?: string }[]): Histo
     .map((t) => ({ q: t.question.trim(), a: t.answer!.split('\n---\n**Sources**')[0].trim().slice(0, HISTORY_ANSWER_CHARS) }))
 }
 
-/** While streaming, hide a chart block that has not closed yet (it renders once complete). */
+/** While streaming, hide a chart or explainer block that has not closed yet (it renders once complete). */
 export function liveMarkdown(text: string) {
   const fences = [...text.matchAll(/^\s*```(.*)$/gm)]
   if (fences.length % 2 === 0) return text
   const open = fences[fences.length - 1]
-  if (!/^chart\b/i.test(open[1].trim())) return text
-  return text.slice(0, open.index).trimEnd() + '\n\n*Drawing a chart…*'
+  const lang = open[1].trim().toLowerCase()
+  if (!/^(chart|explainer)\b/.test(lang)) return text
+  return text.slice(0, open.index).trimEnd() + `\n\n*Drawing ${lang.startsWith('chart') ? 'a chart' : 'a picture'}…*`
+}
+
+// ---- Save to project (spec §5.2, critique E13): owner-only, create-only ----
+
+/** The projects I own (the only ones "Save to project" offers), by title. */
+export function ownedProjects(model: Model, me: Me) {
+  return model.projects
+    .filter((p) => same(p.data.owner, me.login))
+    .map((p) => ({ slug: projectSlug(p), title: String(p.data.title || projectSlug(p)) }))
+    .sort((a, b) => a.title.localeCompare(b.title))
+}
+
+/** Why I can't save into this project ('' = I can): only its owner may add pages to its folder. */
+export function saveRefusal(model: Model, me: Me, slug: string) {
+  const p = model.projects.find((d) => projectSlug(d) === slug)
+  if (!p) return `No such project: ${slug}`
+  return same(p.data.owner, me.login) ? '' : `Only ${p.data.owner ? displayName(model, p.data.owner) : 'its owner'} can add pages to ${String(p.data.title || slug)}`
+}
+
+/**
+ * Save an AI answer as a new page `projects/<slug>/explainer-<topic>.md`. Owner-only (checked here, and again by the
+ * local dev server / the repo's own rules) and create-only: an existing file is never overwritten (`written: false`).
+ * The page keeps the answer's markdown (its explainer/chart blocks render in the project) and points at the answer file.
+ */
+export async function saveToProject(
+  source: Source,
+  me: Me,
+  model: Model,
+  o: { slug: string; question: string; answer: string; answerPath?: string },
+  now: string = nowIso(),
+): Promise<{ path: string; written: boolean }> {
+  const why = saveRefusal(model, me, o.slug)
+  if (why) throw new Error(why)
+  const path = explainerPath(o.slug, o.question)
+  if (!path) throw new Error(`Not a project folder: ${o.slug}`)
+  const title = firstLine(o.question, 80).replace(/^About “(.+)”$/, '$1') || 'Answer'
+  const data = { title, type: 'explainer', project: o.slug, source: o.answerPath || undefined, created: now, by: me.login }
+  const body = `# ${title}\n\n${String(o.answer || '').trim()}\n`
+  const written = await source.update(path, (cur) => (cur === null ? serialize(data, body) : null), `project: save answer to ${o.slug} by ${me.login}`)
+  return { path, written }
+}
+
+/** Plain words for a failed answer (the provider's raw text stays behind "Details"): never an HTTP code or API jargon
+ *  in the main line. */
+export function aiErrorWords(raw: unknown): string {
+  const s = String(raw || '').toLowerCase()
+  if (/api[ _-]?key|gemini (400|403)|no gemini/.test(s)) return "The AI key isn't working · the workspace owner needs to check it"
+  if (/\b401\b|github token|sign[ -]?in/.test(s)) return 'Your sign-in has expired · reconnect in Settings'
+  if (/\b403\b|not allowed/.test(s)) return "Your account can't use HQ AI yet · ask the workspace owner"
+  if (/\b429\b|too many|rate limit|quota|busy/.test(s)) return 'Too many questions right now · try again in a minute'
+  if (/network|failed to fetch|offline|timed? ?out|took too long|did not answer|unreachable/.test(s)) return "Can't reach the AI right now · try again"
+  return "The AI couldn't answer this time · try again"
 }

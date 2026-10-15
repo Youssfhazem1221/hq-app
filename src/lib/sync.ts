@@ -1,6 +1,6 @@
 // Incremental GitHub sync. A check is one conditional tree call (a 304 costs no rate limit);
 // on a change, only blobs whose SHA is new are fetched, in batched GraphQL queries.
-// In memory only: the Pages origin (youssfhazem1221.github.io) is shared with other sites,
+// In memory only: the GitHub Pages origin (<owner>.github.io) is shared with the owner's other sites,
 // so private notes are not persisted in the browser.
 
 export type Api = (path: string, init?: RequestInit) => Promise<Response>
@@ -27,6 +27,44 @@ const b64 = (s: string) => {
   return btoa(bin)
 }
 
+/** A save lost a race: the file changed (or was created) on GitHub after it was read. Source.update() re-reads
+ *  and retries on this error; any other error stops it. */
+export class StaleWriteError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'StaleWriteError'
+  }
+}
+
+/** What Source.update() runs: the current text (null = no such file) → the new text, or null / the same text to skip. */
+export type UpdateFn = (cur: string | null) => string | null | undefined
+
+/**
+ * Optimistic read-modify-write. `get` returns the current text, `fn` makes the new one (pure, so it can run again),
+ * `put` saves it and throws StaleWriteError when the file changed meanwhile. Up to `tries` rounds.
+ * true = something was written; false = `fn` had nothing to change (no PUT, no empty commit).
+ */
+export async function updateLoop(
+  get: () => string | null | undefined | Promise<string | null | undefined>,
+  put: (next: string, cur: string | null) => Promise<unknown>,
+  fn: UpdateFn,
+  tries = 3,
+  path = 'this file',
+): Promise<boolean> {
+  for (let i = 0; i < tries; i++) {
+    const cur = (await get()) ?? null
+    const next = fn(cur)
+    if (next === null || next === undefined || next === cur) return false
+    try {
+      await put(next, cur)
+      return true
+    } catch (e) {
+      if (!(e instanceof StaleWriteError)) throw e
+    }
+  }
+  throw new Error(`Not saved after ${tries} tries: ${path} keeps changing. Your text is still in the box.`)
+}
+
 /** A readable error for a failed GitHub response. */
 export async function ghError(r: Response) {
   const msg = (await r.text().catch(() => '')).slice(0, 200)
@@ -45,8 +83,18 @@ export class RepoSync {
   private running: Promise<SyncResult> | null = null
   /** Changes found by write()'s own re-sync, handed to the next takeChanged() so the page still sees them. */
   private missed = new Set<string>()
+  // Plain fields (no constructor parameter properties), so Node can load this file by type stripping (tests).
+  private api: Api
+  private owner: string
+  private repo: string
+  private branch: string
 
-  constructor(private api: Api, private owner: string, private repo: string, private branch: string) {}
+  constructor(api: Api, owner: string, repo: string, branch: string) {
+    this.api = api
+    this.owner = owner
+    this.repo = repo
+    this.branch = branch
+  }
 
   private get base() {
     return `/repos/${this.owner}/${this.repo}`
@@ -54,6 +102,11 @@ export class RepoSync {
 
   list(): FileEntry[] {
     return [...this.files].map(([path, f]) => ({ path, text: f.text }))
+  }
+
+  /** The cached text of one file (≤ one sync old), or undefined when the cache has no such file. No API call. */
+  cached(path: string): string | undefined {
+    return this.files.get(path)?.text
   }
 
   /** `changed` plus anything write() synced on its own since the last call. */
@@ -143,7 +196,8 @@ export class RepoSync {
 
   /**
    * Save one file. Uses the cached blob SHA (no extra GET). On a stale SHA it syncs: if the file changed (or was
-   * created) on GitHub meanwhile, it throws instead of overwriting that newer version; otherwise it retries once.
+   * created) on GitHub meanwhile, it throws StaleWriteError instead of overwriting that newer version (the cache
+   * now holds the new text, so Source.update() can re-run its change on it); otherwise it retries once.
    */
   async write(path: string, text: string, message: string) {
     const put = (sha?: string) =>
@@ -158,7 +212,7 @@ export class RepoSync {
       for (const p of (await this.sync()).changed) this.missed.add(p)
       const now = this.files.get(path)
       if (now?.text === text) return // already saved (e.g. an earlier try whose response was lost)
-      if (now?.sha !== before) throw new Error(`Not saved: ${path} was changed on GitHub just now (by someone else or another tab). The page will show the new version; make your change again.`)
+      if (now?.sha !== before) throw new StaleWriteError(`Not saved: ${path} was changed on GitHub just now (by someone else or another tab). The page will show the new version; make your change again.`)
       r = await put(now?.sha)
     }
     if (!r.ok) throw await ghError(r)
