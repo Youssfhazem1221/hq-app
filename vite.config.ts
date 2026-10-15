@@ -305,7 +305,7 @@ const sseSend = (res: any, event: string, data: unknown) => {
 }
 
 type SourceRef = { title?: string; url?: string; path?: string }
-type Done = { model?: string; seconds?: number; tools?: string[]; sources?: SourceRef[]; text?: string }
+type Done = { model?: string; seconds?: number; tools?: string[]; sources?: SourceRef[]; text?: string; key?: { kind?: string; slot?: number; borrowed?: string } | null }
 
 /** Answer file body: the answer + a Sources section (same shape the worker writes). */
 function answerBody(d: Done) {
@@ -390,6 +390,7 @@ async function askLocal(root: string, envFile: string, b: any, res: any, shared:
     const ansData = {
       id: q.id, request: q.id, model: done.model, created: nowIso(), status: failure ? 'error' : 'done',
       seconds, tools: Array.isArray(done.tools) ? done.tools : [], handled_by: 'local',
+      key: done.key ? (done.key.kind === 'env' ? 'server' : `${done.key.kind}-${done.key.slot}${done.key.borrowed ? '@' + done.key.borrowed : ''}`) : undefined,
     }
     const dir = path.join(root, 'ai')
     fs.mkdirSync(path.join(dir, 'requests'), { recursive: true })

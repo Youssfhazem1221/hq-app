@@ -381,13 +381,27 @@ function Question({ text, kind, project, author, projectTitle }: { text: string;
   )
 }
 
-const ModelLine = ({ deep, seconds, error }: { deep: boolean; seconds?: unknown; error?: boolean }) => (
+/** 'free-1' | 'free-2' | 'paid-3' | 'server' (+ '@owner' when borrowed) → a short chip; anything else → nothing. */
+function KeyChip({ tag }: { tag?: unknown }) {
+  const m = /^(free|paid)-(\d)(?:@([\w-]+))?$|^(server)$/.exec(str(tag))
+  if (!m) return null
+  const text = m[4] ? 'Server key' : m[1] === 'paid' ? 'Paid key' : `Free key ${m[2]}` + (m[3] ? ` · ${m[3]}` : '')
+  return (
+    <span className={'chip ' + (m[1] === 'paid' ? 'warn' : 'ok')} title={m[3] ? `Borrowed from ${m[3]} (you have no keys)` : 'The Gemini key that answered (Settings → AI keys)'}>
+      <Icon name={m[1] === 'paid' ? 'coins' : 'zap'} />
+      {text}
+    </span>
+  )
+}
+
+const ModelLine = ({ deep, seconds, error, keyTag }: { deep: boolean; seconds?: unknown; error?: boolean; keyTag?: unknown }) => (
   <div className="a-h">
     <span className="av ai" aria-hidden="true">
       <Icon name="spark" />
     </span>
     HQ AI · {deep ? 'Deep' : 'Fast'}
     {seconds != null && seconds !== '' ? ` · ${seconds} s` : ''}
+    <KeyChip tag={keyTag} />
     {error && (
       <span className="chip bad">
         <Icon name="alert" />
@@ -409,7 +423,7 @@ function SavedTurn({ r, projectTitle }: { r: Doc; projectTitle: (s?: unknown) =>
       <article className="a" aria-label="Answer">
         {a ? (
           <>
-            <ModelLine deep={deep} seconds={a.data.seconds} error={a.data.status === 'error'} />
+            <ModelLine deep={deep} seconds={a.data.seconds} error={a.data.status === 'error'} keyTag={a.data.key} />
             <AnswerView md={a.body} base={a.path}>
               <AnswerActions id={id} question={r.body} md={a.body} project={str(r.data.project) || undefined} />
             </AnswerView>
@@ -427,7 +441,7 @@ function LiveTurn({ l, projectTitle }: { l: Live; projectTitle: (s?: unknown) =>
     <div className="turn" data-turn={l.id}>
       <Question text={l.question} project={l.project} projectTitle={projectTitle} />
       <article className="a" aria-label="Answer" aria-live="polite">
-        <ModelLine deep={l.model === 'deep'} seconds={l.seconds} error={l.state === 'error'} />
+        <ModelLine deep={l.model === 'deep'} seconds={l.seconds} error={l.state === 'error'} keyTag={l.key} />
         <LiveAnswer l={l}>{l.state === 'done' && l.text ? <AnswerActions id={l.id} question={l.question} md={l.text} project={l.project} /> : null}</LiveAnswer>
       </article>
     </div>

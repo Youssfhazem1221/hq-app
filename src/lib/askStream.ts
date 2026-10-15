@@ -25,6 +25,8 @@ export type Live = {
   sources: SourceRef[]
   tools: string[]
   seconds?: number
+  /** the Gemini key that answered: 'free-1' | 'free-2' | 'paid-3' | 'server' (+ '@owner' when borrowed) */
+  key?: string
   error?: string
   started: number
 }
@@ -161,6 +163,7 @@ async function stream(source: Source, req: AskOptions & { id: string }, history:
             sources: Array.isArray(data?.sources) && data.sources.length ? data.sources : l.sources,
             tools: Array.isArray(data?.tools) ? data.tools.map(String) : [],
             seconds: typeof data?.seconds === 'number' ? data.seconds : Math.round((Date.now() - l.started) / 1000),
+            key: data?.key && typeof data.key === 'object' ? (data.key.kind === 'env' ? 'server' : `${data.key.kind}-${data.key.slot}${data.key.borrowed ? '@' + data.key.borrowed : ''}`) : undefined,
             // The function answered but its commit failed: the answer lives only in this tab.
             error: data?.saved === false && !data?.dry_run ? `Not saved to GitHub${data?.saveError ? `: ${String(data.saveError).slice(0, 160)}` : ''}. Copy it if you need it.` : undefined,
           }), true)
