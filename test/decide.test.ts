@@ -23,6 +23,8 @@ const EXTRA: Record<string, string> = {
     'milestones:', '  - text: "Research options"', '    date: 2026-10-02', '    done: true', '  - text: "Pick a direction"', '    done: false', '  - text: "First paid audit"', '    done: false']),
   'todos/20261014-140003-claude-p04.md': fm(['id: 20261014-140003-claude-p04', 'title: "Pick a pricing direction (#1, #2, both, other)"', 'status: todo', 'owner: alice',
     'created: 2026-10-14T14:00:03Z', 'by: claude', 'link: notes/earn.md']),
+  'todos/20261015-110000-alice-m06.md': fm(['id: 20261015-110000-alice-m06', 'title: "First paid audit"', 'status: todo', 'owner: alice',
+    'created: 2026-10-15T11:00:00Z', 'by: alice', 'project: pricing']),
   'todos/20261015-100000-alice-b05.md': fm(['id: 20261015-100000-alice-b05', 'title: "Choose an audit tool to try"', 'kind: decision', 'status: todo', 'owner: bob',
     'created: 2026-10-15T10:00:00Z', 'by: alice', 'project: pricing', 'link: notes/earn.md']),
 }
@@ -116,4 +118,29 @@ test('Done (completeItem) through LocalSource: stamps only, undo restores bytes;
   await undo()
   assert.equal(read(root, TODO), t0)
   assert.ok(N.nextQueue(buildModel(await src.loadAll()), me, '2026-10-15T12:00:00Z').some((x: any) => x.path === TODO))
+})
+
+test('Done on a to-do made from a milestone ticks that milestone (owner only); undo restores both files', { skip: !F && 'fixture not available' }, async (t) => {
+  const root = seed('tick-ms')
+  const local = await startLocal(root, 'alice')
+  t.after(async () => {
+    await local.close()
+    rm(root)
+  })
+  const src = new LocalSource()
+  const me = await src.me()
+  const TODO = 'todos/20261015-110000-alice-m06.md'
+  const PROJ = 'projects/pricing/project.md'
+  const t0 = read(root, TODO)
+  const p0 = read(root, PROJ)
+  const undo = await N.completeItem(src, me, buildModel(await src.loadAll()), { path: TODO, text: 'First paid audit' }, { now: '2026-10-15T12:00:00Z', day: '2026-10-15' })
+  assert.match(read(root, TODO), /status: done/)
+  const p1 = read(root, PROJ)
+  const block = p1.slice(p1.indexOf('First paid audit')).split('\n  - ')[0]
+  assert.match(block, /done: true/)
+  assert.match(block, /date: 2026-10-15/)
+  assert.equal(p1.split('\n').length, p0.split('\n').length + 1, 'only the date line is added')
+  await undo()
+  assert.equal(read(root, TODO), t0)
+  assert.equal(read(root, PROJ), p0)
 })

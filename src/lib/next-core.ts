@@ -638,9 +638,44 @@ const revertDone = (before: string) => (cur: string) => {
   })
 }
 
-/** Done on a to-do (the Next `todo` button, a tick in a list): status done + done_at/done_by. Already done → nothing.
- *  Returns the undo (restores the exact bytes). */
-export async function completeItem(src: UpdateSource, me: NextMe, _m: NextModel, item: { path?: string; text?: string }, opts: { now?: unknown } = {}): Promise<Undo> {
+export type TickResult = { ticked: string | null; project?: string; undo: Undo }
+/**
+ * A to-do just got done: ONLY when I own its project, the matching open milestone gets `done: true` + `date:`
+ * (tickMilestone), so the project's progress moves with the to-do. Never throws; nothing to tick → ticked null.
+ */
+export async function tickMilestoneForTodo(src: UpdateSource, me: NextMe, m: NextModel, todoPath: string, title: string, day: string): Promise<TickResult> {
+  const login = loginOf(me)
+  const todo = docAt(m, todoPath) || (m.todos || []).find((t) => t.path === todoPath)
+  const slug = todo ? projectOfTodo(todo, m) : undefined
+  const proj = slug ? projectBySlug(m, slug) : undefined
+  const none = { ticked: null, project: slug, undo: async () => {} }
+  if (!proj || !same(dataOf(proj).owner, login)) return none
+  const ms = matchMilestone(proj, title || (todo ? todoTitle(todo) : ''))
+  if (!ms) return none
+  let pBefore: string | null = null
+  let pAfter: string | null = null
+  try {
+    const ok = await src.update(proj.path, (cur) => {
+      pBefore = cur
+      pAfter = null
+      if (cur === null) return null
+      // the file I edit must still be owned by me (it may have changed hands since the model loaded)
+      if (!same(topScalars(cur).owner, login)) return null
+      const next = tickMilestone(cur, ms.text, day)
+      if (next !== cur) pAfter = next
+      return next
+    }, `project: milestone done · ${label(ms.text)}`)
+    if (!ok || pAfter === null) return none
+  } catch {
+    // the to-do itself is saved; a milestone that could not be ticked is not a reason to fail it
+    return none
+  }
+  return { ticked: ms.text, project: slug, undo: restorer(src, proj.path, pBefore, pAfter, `project: milestone reopened · ${label(ms.text)}`) }
+}
+
+/** Done on a to-do (the Next `todo` button, a tick in a list): status done + done_at/done_by, and the project's matching
+ *  milestone is ticked too (when I own the project). Already done → nothing. Returns the undo (restores the exact bytes). */
+export async function completeItem(src: UpdateSource, me: NextMe, m: NextModel, item: { path?: string; text?: string }, opts: { now?: unknown; day?: string } = {}): Promise<Undo> {
   const path = str(item && item.path)
   if (!/^todos\/[^/]+\.md$/.test(path)) throw new Error('Only a to-do can be ticked here')
   const login = loginOf(me)
@@ -655,7 +690,14 @@ export async function completeItem(src: UpdateSource, me: NextMe, _m: NextModel,
     return after
   }, `todo: done · ${label(item.text || topScalars(before || '').title || path)}`)
   if (!written) return async () => {}
-  return restorer(src, path, before, after, `todo: reopen · ${label(item.text || path)}`, revertDone(before!))
+  const undoTodo = restorer(src, path, before, after, `todo: reopen · ${label(item.text || path)}`, revertDone(before!))
+  if (after === null) return undoTodo
+  const day = /^\d{4}-\d{2}-\d{2}$/.test(str(opts.day)) ? str(opts.day) : N.slice(0, 10)
+  const tick = await tickMilestoneForTodo(src, me, m, path, item.text || topScalars(before || '').title || '', day)
+  return async () => {
+    await tick.undo()
+    await undoTodo()
+  }
 }
 
 export type DecideResult = { undo: Undo; written: boolean; ticked: string | null; project?: string }
@@ -684,40 +726,14 @@ export async function decide(src: UpdateSource, me: NextMe, m: NextModel, todoPa
   }, `todo: done · ${label(title || todoPath)} → ${label(c)}`)
   if (!written) return { undo: async () => {}, written: false, ticked: null }
 
-  const slug = todo ? projectOfTodo(todo, m) : undefined
-  const proj = slug ? projectBySlug(m, slug) : undefined
-  let ticked: string | null = null
-  let pBefore: string | null = null
-  let pAfter: string | null = null
-  if (proj && same(dataOf(proj).owner, login)) {
-    const ms = matchMilestone(proj, title)
-    if (ms) {
-      try {
-        const ok = await src.update(proj.path, (cur) => {
-          pBefore = cur
-          pAfter = null
-          if (cur === null) return null
-          // the file I edit must still be owned by me (it may have changed hands since the model loaded)
-          if (!same(topScalars(cur).owner, login)) return null
-          const next = tickMilestone(cur, ms.text, day)
-          if (next !== cur) pAfter = next
-          return next
-        }, `project: milestone done · ${label(ms.text)}`)
-        if (ok && pAfter !== null) ticked = ms.text
-      } catch {
-        // the decision itself is saved; a milestone that could not be ticked is not a reason to fail it
-        pAfter = null
-      }
-    }
-  }
+  const tick = await tickMilestoneForTodo(src, me, m, todoPath, title, day)
   const undoTodo = restorer(src, todoPath, tBefore, tAfter, `todo: reopen · ${label(title || todoPath)}`, revertDone(tBefore!))
-  const undoProj = ticked ? restorer(src, proj!.path, pBefore, pAfter, `project: milestone reopened · ${label(ticked)}`) : async () => {}
   return {
     written: true,
-    ticked,
-    project: slug,
+    ticked: tick.ticked,
+    project: tick.project,
     undo: async () => {
-      await undoProj()
+      await tick.undo()
       await undoTodo()
     },
   }

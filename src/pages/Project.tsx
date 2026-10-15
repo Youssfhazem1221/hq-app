@@ -76,6 +76,35 @@ function ProjectView({ p, slug, next }: { p: Doc; slug: string; next: ReturnType
     }
   }
 
+  // owner: mark the whole project done (or reopen it), with Undo
+  const owner = same(p.data.owner, me.login)
+  const msList: any[] = Array.isArray(p.data.milestones) ? p.data.milestones : []
+  const allDone = msList.length > 0 && msList.every((x) => x && x.done === true)
+  const isDone = String(p.data.status || '').toLowerCase() === 'done'
+  const setStatus = async (status: 'done' | 'active') => {
+    let before: string | null = null
+    let after: string | null = null
+    try {
+      const ok = await source.update(p.path, (cur) => {
+        before = cur
+        after = cur === null ? null : setTopKeys(cur, { status, updated: new Date().toISOString().slice(0, 10) })
+        return after
+      }, `project: ${status === 'done' ? 'done' : 'reopened'} · ${String(p.data.title || slug).slice(0, 40)}`)
+      if (!ok) return
+      await reload()
+      toast(status === 'done' ? 'Project marked done 🎉' : 'Project reopened', 'ok', {
+        undo: () => {
+          source
+            .update(p.path, (cur) => (cur !== null && cur === after && before !== null ? before : cur), 'project: undo status')
+            .then(() => reload())
+            .catch((e) => toast(String(e?.message || e), 'error'))
+        },
+      })
+    } catch (e: any) {
+      toast(String(e?.message || e), 'error')
+    }
+  }
+
   const blocks: Record<ProjectWidget, ReactNode> = {
     journey: <Journey project={p} next={next} onAddMilestone={same(p.data.owner, me.login) ? addMilestone : undefined} />,
     explainers: <ProjectPicture p={p} slug={slug} />,
@@ -109,6 +138,12 @@ function ProjectView({ p, slug, next }: { p: Doc; slug: string; next: ReturnType
           <>
             <StatusPill status={p.data.status} />
             <StaleDot updated={p.data.updated} />
+            {owner && (
+              <button className={'btn sm ' + (allDone && !isDone ? 'primary' : 'ghost')} type="button" onClick={() => void setStatus(isDone ? 'active' : 'done')}>
+                <Icon name={isDone ? 'undo' : 'ok'} size="s" />
+                {isDone ? 'Reopen project' : 'Mark project done'}
+              </button>
+            )}
           </>
         }
         tiles={[openTodos.length ? { value: openTodos.length, label: openTodos.length === 1 ? 'open to-do' : 'open to-dos' } : null]}

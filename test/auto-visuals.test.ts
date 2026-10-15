@@ -287,10 +287,15 @@ test('(B3) real options frontmatter: 5 points; #1 = fast + verified + recommende
   assert.equal(spec.rows.filter((r: any) => r.pick).length, 1)
 })
 
-test('(B3) real HQ project.md: 8 done, NOW = "Ask one question…", 1 later', { skip: !hq && 'private workspace not available' }, () => {
+// Real data changes (milestones get ticked), so the expectations come from the file itself.
+test('(B3) real HQ project.md: done / NOW / later match its milestones', { skip: !hq && 'private workspace not available' }, () => {
   const j = V.journeyModel(hq, null)
-  assert.equal(j.done, 8)
-  assert.match(j.nodes[j.nowK].text, /^Ask one question/)
-  assert.equal(j.nodes.filter((n: any) => n.kind === 'later').length, 1)
-  assert.equal(j.total, 10)
+  const ms: any[] = (hq as any).data.milestones || []
+  const open = ms.filter((m) => !m.done)
+  assert.equal(j.total, ms.length)
+  assert.equal(j.done, ms.length - open.length)
+  if (open.length) {
+    assert.equal(j.nodes[j.nowK].text, String(open[0].text))
+    assert.equal(j.nodes.filter((n: any) => n.kind === 'later').length, open.length - 1)
+  }
 })
