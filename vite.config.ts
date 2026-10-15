@@ -258,13 +258,23 @@ export async function localUiTweak(
   for (const k of UI_TWEAK_ENV) if (all[k]) env[k] = all[k]
   const net = o.fetch || ((...a: Parameters<typeof fetch>) => globalThis.fetch(...a))
   try {
-    const r = await handle(body, { login: localLogin(o.envFile), configured: !!configuredLogin(o.envFile), local: true, env, fetch: net, bytes: raw.bytes })
+    const shared = o.shared || SHARED
+    const keyFor = (login: string) => localKeyFor(all, shared, login)
+    const r = await handle(body, { login: localLogin(o.envFile), configured: !!configuredLogin(o.envFile), local: true, env, keyFor, fetch: net, bytes: raw.bytes })
     const status = Number.isInteger(r?.status) && r.status >= 200 && r.status <= 599 ? r.status : 502
     return { status, body: r?.body ?? {} }
   } catch {
     // never echo the error: it could carry a request URL
     return { status: 502, body: { error: 'Adjust look failed. Try again, or use the presets.' } }
   }
+}
+
+/** The Gemini key ring for `login` (supabase/functions/_shared/gemini-keys.mjs, imported per call like the AI core). */
+async function localKeyFor(env: Record<string, string>, shared: string, login: string): Promise<unknown> {
+  const f = path.join(shared, 'gemini-keys.mjs')
+  if (!fs.existsSync(f)) return env.GEMINI_API_KEY || env.GOOGLE_API_KEY || ''
+  const mod = await import(pathToFileURL(f).href + '?v=' + fs.statSync(f).mtimeMs)
+  return mod.withKeys({ ...env, SUPABASE_SECRET_KEY: env.SUPABASE_SECRET_KEY || env.SUPABASE_SERVICE_ROLE_KEY }).keyFor(login)
 }
 
 function gitLog(root: string, p?: string): Promise<{ date: string; author: string; message: string }[]> {
@@ -342,8 +352,9 @@ async function askLocal(root: string, envFile: string, b: any, res: any, shared:
     if (!fs.existsSync(core)) throw new Error('The AI core (supabase/functions/_shared/answer.mjs) is not there yet.')
     // Imported per request (cache-busted by mtime), so edits to answer.mjs apply without a restart.
     const { streamAnswer } = await import(pathToFileURL(core).href + '?v=' + fs.statSync(core).mtimeMs)
-    const apiKey = env.GEMINI_API_KEY || env.GOOGLE_API_KEY
-    if (!apiKey) throw new Error('No GEMINI_API_KEY in .env.local')
+    // The person's own keys (Settings → AI keys) → the owner's free keys → GEMINI_API_KEY in .env.local
+    const apiKey = await localKeyFor(env, shared, me)
+    if (!apiKey || (typeof apiKey === 'object' && !(apiKey as { size: number }).size)) throw new Error('No Gemini key: add one in Settings → AI keys')
     const secret = env.SUPABASE_SECRET_KEY || env.SUPABASE_SERVICE_ROLE_KEY
     await streamAnswer(
       {
@@ -501,6 +512,17 @@ export function hqLocal(opts: { root?: string; envFile?: string; shared?: string
               // Adjust look + onboarding profile draft (no writes). POST + JSON + same origin are checked above.
               if (req.method !== 'POST') return send(res, 405, { error: 'POST only' })
               const r = await localUiTweak(await readRawBody(req, UI_TWEAK_MAX_BODY), { envFile, shared: opts.shared, fetch: opts.fetch })
+              return send(res, r.status, r.body)
+            }
+            case '/__hq/keys': {
+              // Settings → AI keys for the local login. Same handler as the `keys` edge function; never returns a key.
+              if (req.method !== 'POST') return send(res, 405, { error: 'POST only' })
+              const b = await readBody(req)
+              const f = path.join(opts.shared || SHARED, 'keys-handler.mjs')
+              if (!fs.existsSync(f)) return send(res, 501, { error: 'AI keys are not built here' })
+              const mod = await import(pathToFileURL(f).href + '?v=' + fs.statSync(f).mtimeMs)
+              const all = readEnv(envFile)
+              const r = await mod.handleKeys(b, { login: localLogin(envFile), env: { ...all, SUPABASE_SECRET_KEY: all.SUPABASE_SECRET_KEY || all.SUPABASE_SERVICE_ROLE_KEY } })
               return send(res, r.status, r.body)
             }
             case '/__hq/ai': {

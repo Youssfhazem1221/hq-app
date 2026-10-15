@@ -405,7 +405,7 @@ test('palette Look items: 5 presets; "Adjust look: “q”" on top only when the
   assert.equal(AL.lookPaletteItems('add a pomodoro timer', api)[0].id, 'look:preset:focus')
 })
 
-test('Settings + drawer render: v3 page, all four sections, no inline style values, honest "saved" copy per store', () => {
+test('Settings + drawer render: v3 page, all five sections, no inline style values, honest "saved" copy per store', () => {
   assert.equal(SET.v3, true)
   const page = (api?: unknown) =>
     renderToString(
@@ -414,7 +414,7 @@ test('Settings + drawer render: v3 page, all four sections, no inline style valu
         : h(SET.default, { route: { page: 'Settings', nav: 'settings', path: '/settings' }, source: null, onConnect() {} }),
     ).replace(/<!-- -->/g, '')
   const html = page()
-  for (const id of ['s-appearance', 's-connection', 's-shortcuts', 's-about']) assert.match(html, new RegExp(`id="${id}"`))
+  for (const id of ['s-appearance', 's-connection', 's-keys', 's-shortcuts', 's-about']) assert.match(html, new RegExp(`id="${id}"`))
   assert.match(html, /Saved on this device/, 'the interim store keeps the look on this device only')
   assert.doesNotMatch(html, /style="/)
   assert.match(html, /role="switch"[^>]*aria-checked="true"[^>]*aria-label="Single-key shortcuts"|aria-label="Single-key shortcuts"/)

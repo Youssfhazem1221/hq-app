@@ -14,6 +14,7 @@ import { lookExtras } from '../lib/prefs'
 import { PageHeader } from '../components/shell/PageHeader'
 import { Segmented, Switch, Toggle } from '../components/ui'
 import { JoinGuideButton } from '../components/people/JoinGuide'
+import { AiKeys } from '../components/AiKeys'
 
 export const v3 = true
 
@@ -22,6 +23,7 @@ type Props = SettingsPageProps & { theme?: string; toggleTheme?: () => void }
 const SECTIONS: [string, IconName, string][] = [
   ['appearance', 'wand', 'Appearance'],
   ['connection', 'plug', 'Connection'],
+  ['keys', 'lock', 'AI keys'],
   ['shortcuts', 'keyboard', 'Shortcuts'],
   ['about', 'info', 'About HQ'],
 ]
@@ -394,6 +396,12 @@ export default function Settings({ source, onConnect }: Props) {
                 )}
               </p>
             </Toggle>
+          </section>
+
+          {/* ---------------- AI keys ---------------- */}
+          <section className="set-sec" id="s-keys" aria-labelledby="s-keys-h">
+            <h2 id="s-keys-h">AI keys</h2>
+            <AiKeys source={source as { kind: string; auth?: { token: string } } | null} />
           </section>
 
           {/* ---------------- Shortcuts ---------------- */}
