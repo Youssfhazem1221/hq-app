@@ -186,3 +186,29 @@ section+section>.grp,.gallery+section>.grp{margin-top:18px}
 .journey .tl .nd.ck{cursor:pointer;border:1.5px solid var(--line);background:var(--pane);display:inline-grid;place-items:center;padding:0}
 .journey .tl .nd.ck:hover{border-color:var(--accent)}
 .journey .tl li.done .nd.ck{background:var(--accent);border-color:var(--accent);color:#fff}
+
+/* Project board (a project's board: lanes of cards) */
+.pb-lanes{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(190px,1fr);gap:10px;overflow-x:auto;padding-bottom:6px;scroll-snap-type:x proximity}
+.pb-lane{background:var(--pane-2);border-radius:12px;padding:10px;display:grid;align-content:start;gap:8px;min-width:0;scroll-snap-align:start}
+.pb-h{display:flex;align-items:center;gap:8px;margin:0 2px 2px;font-size:var(--t-xs);font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--fg-2)}
+.pb-card{background:var(--raise);border:1px solid var(--line);border-radius:10px;padding:10px;display:grid;gap:6px;min-width:0}
+.pb-card.late{border-color:var(--warn)}
+.pb-t{font-weight:600;font-size:var(--t-sm);line-height:1.3;color:var(--fg);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.pb-meta,.pb-links{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.pb-day{display:inline-flex;align-items:center;gap:4px;font-size:var(--t-xs);color:var(--muted)}
+.pb-day svg{width:13px;height:13px}
+.pb-next{margin:0;font-size:var(--t-xs);color:var(--muted)}
+.pb-next.late{color:var(--warn-ink);font-weight:600}
+.pb-edit{margin-left:auto}
+.pb-empty{margin:0;font-size:var(--t-xs);color:var(--muted)}
+.pb-form label{display:grid;gap:4px;font-size:var(--t-xs);color:var(--fg-2)}
+.pb-btns{display:flex;gap:6px}
+/* Grouped pages */
+.pg-grp+.pg-grp{border-top:1px solid var(--line)}
+.pg-grp>summary{display:flex;align-items:center;gap:8px;padding:8px 2px;cursor:pointer}
+.pg-label{font-weight:600;flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pg-row2{flex-wrap:wrap}
+.pg-main{display:flex;align-items:center;gap:10px;flex:1;min-width:0;color:var(--fg)}
+.pb-h .count{margin-left:auto;font-weight:600;color:var(--muted)}
+.pg-grp .count{font-weight:600;color:var(--muted);font-size:var(--t-xs)}
+.pb-more{justify-self:start}

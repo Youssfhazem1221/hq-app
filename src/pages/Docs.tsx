@@ -21,6 +21,7 @@ import { claimRich } from '../components/explainers/parse'
 import { StatusBoard, statusFromText } from '../components/visuals/StatusBoard'
 import { ExplainPanel, RichMd } from '../components/ExplainPanel'
 import { Empty, Markdown, StatusPill, Toggle } from '../components/ui'
+import { toast } from '../components/toast'
 
 export const v3 = true
 
@@ -70,7 +71,7 @@ function docIconOf(model: Model, path: string): IconName {
 }
 
 function Reader({ doc }: { doc: Doc }) {
-  const { model, me, source } = useHQ()
+  const { model, me, source, reload } = useHQ()
   const narrow = useIsNarrow()
   const [explain, setExplain] = useState(false)
   const explainBtn = useRef<HTMLButtonElement>(null)
@@ -83,6 +84,43 @@ function Reader({ doc }: { doc: Doc }) {
   const ctx = newBlockCtx(doc.path, decide)
   const showCompare = !!spec && claimRich(ctx)
   const web = source.webUrl(doc.path) || (source.kind === 'local' ? '/__hq/read?path=' + encodeURIComponent(doc.path) : null)
+  // Edit (owner of the project this page lives in): the page's exact text in a box; Save only when nobody changed the file meanwhile.
+  const home = projectOfPath(doc.path)
+  const owner = home ? String(model.projects.find((x) => projectSlug(x) === home)?.data.owner || '') : ''
+  const canEdit = !!owner && owner.toLowerCase() === String(me.login || '').toLowerCase()
+  const [draft, setDraft] = useState<{ text: string; orig: string } | null>(null)
+  const [saving, setSaving] = useState(false)
+  const startEdit = () =>
+    source
+      .read(doc.path)
+      .then((raw) => setDraft({ text: raw ?? '', orig: raw ?? '' }))
+      .catch((e) => toast(String(e?.message || e), 'error'))
+  const saveEdit = async () => {
+    if (!draft) return
+    setSaving(true)
+    const { text, orig } = draft
+    try {
+      const ok = await source.update(doc.path, (cur) => {
+        if ((cur ?? '') !== orig) throw new Error('This page changed since you opened it. Copy your text, reload, then edit again.')
+        return text === cur ? null : text
+      }, `docs: edit ${title(doc).slice(0, 50)}`)
+      setDraft(null)
+      if (!ok) return
+      await reload()
+      toast('Saved', 'ok', {
+        undo: () => {
+          source
+            .update(doc.path, (cur) => (cur === text ? orig : cur), `docs: undo edit ${title(doc).slice(0, 40)}`)
+            .then(() => reload())
+            .catch((e) => toast(String(e?.message || e), 'error'))
+        },
+      })
+    } catch (e: any) {
+      toast(String(e?.message || e), 'error')
+    } finally {
+      setSaving(false)
+    }
+  }
 
   // Wide tables (3+ columns) → cards on phones: each cell gets its column name.
   useLayoutEffect(() => {
@@ -119,6 +157,12 @@ function Reader({ doc }: { doc: Doc }) {
             <Icon name="spark" size="s" />
             Explain this page
           </button>
+          {canEdit && !draft && (
+            <button className="btn sm" type="button" onClick={() => void startEdit()}>
+              <Icon name="edit" size="s" />
+              Edit
+            </button>
+          )}
           {web && (
             <a className="btn ghost sm" href={web} target="_blank" rel="noopener noreferrer" data-tipt={doc.path}>
               <Icon name="ext" size="s" />
@@ -126,6 +170,22 @@ function Reader({ doc }: { doc: Doc }) {
             </a>
           )}
         </div>
+        {draft ? (
+          <div className="doc-edit">
+            <p className="hint">The page's text in Markdown. The lines between the two --- at the top are its settings.</p>
+            <textarea className="inp doc-ta" aria-label="Page text" value={draft.text} spellCheck onChange={(e) => setDraft({ ...draft, text: e.target.value })} />
+            <div className="doc-acts">
+              <button className="btn sm primary" type="button" disabled={saving || draft.text === draft.orig} onClick={() => void saveEdit()}>
+                {saving ? 'Saving…' : 'Save'}
+              </button>
+              <button className="btn sm ghost" type="button" onClick={() => setDraft(null)}>
+                Cancel
+              </button>
+              <span className="hint">{draft.text === draft.orig ? 'No changes yet' : 'Unsaved changes'}</span>
+            </div>
+          </div>
+        ) : (
+          <>
         {narrow && panel}
         {showCompare && (
           <Suspense fallback={<div className="ex ex-loading" aria-busy="true" />}>
@@ -146,6 +206,8 @@ function Reader({ doc }: { doc: Doc }) {
             return n
           })} />
         ))}
+          </>
+        )}
       </article>
       {!narrow && (panel || (outline.sections.length >= 2 && <Toc sections={outline.sections} article={article} onJump={openSection} long={outline.long} opened={opened} />))}
     </div>

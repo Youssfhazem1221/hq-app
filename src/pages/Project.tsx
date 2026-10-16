@@ -7,7 +7,8 @@ import { Fragment, useMemo, useState, type ReactNode } from 'react'
 import { useHQ, usePrefsApi } from '../lib/hq-context'
 import type { PageProps, ProjectWidget } from '../lib/contracts'
 import { displayName, projectFolder } from '../lib/hq'
-import { title as docTitle, type Doc } from '../lib/md'
+import type { Doc } from '../lib/md'
+import { boardConfig } from '../lib/project-board'
 import { setTopKeys } from '../lib/people-core'
 import { addFirstMilestone } from '../lib/people'
 import type { Commit } from '../lib/source'
@@ -21,6 +22,8 @@ import { Journey } from '../components/visuals/Journey'
 import { Scatter } from '../components/visuals/Scatter'
 import { GoalMeter } from '../components/visuals/GoalMeter'
 import TeamCard from '../components/people/TeamCard'
+import { ProjectBoard } from '../components/project/Board'
+import { ProjectPages } from '../components/project/Pages'
 import { NextActionsProvider, useProjectNext } from '../components/NextActions'
 import { Icon } from '../lib/icons'
 import { toast } from '../components/toast'
@@ -28,7 +31,6 @@ import { AgeTip, ProjectGlyph, StaleDot, humanChange, plural, projectBySlug, sam
 
 export const v3 = true
 
-const list = (v: unknown): string[] => (Array.isArray(v) ? v.map((x) => String(x ?? '').trim()).filter(Boolean) : typeof v === 'string' && v.trim() ? v.split(',').map((x) => x.trim()) : [])
 const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : typeof v === 'string' && v.trim() !== '' && Number.isFinite(Number(v)) ? Number(v) : null)
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 const dayLabel = (d: string) => (/^\d{4}-\d{2}-\d{2}/.test(d) ? `${+d.slice(8, 10)} ${MONTHS[+d.slice(5, 7) - 1]}` : d)
@@ -154,13 +156,36 @@ function ProjectView({ p, slug, next }: { p: Doc; slug: string; next: ReturnType
         onToggleMilestone={same(p.data.owner, me.login) ? toggleMilestone : undefined}
       />
     ),
-    explainers: <ProjectPicture p={p} slug={slug} />,
+    explainers: (
+      <>
+        <ProjectBoard p={p} slug={slug} />
+        <ProjectPicture p={p} slug={slug} />
+      </>
+    ),
     team: null, // drawn with files (one row)
     files: null,
     activity: <Activity p={p} slug={slug} />,
   }
-  const teamRow =
-    order.includes('team') || order.includes('files') ? (
+  // a board or many pages: team and pages each get a full row, so the grouped pages have room
+  const wide = !!boardConfig(p, slug) || (model.projectFiles.get(slug)?.length || 0) > 12
+  const teamRow = wide ? (
+    <>
+      {order.includes('team') && (
+        <div className="wg pj-row">
+          <div className="g12 secondary">
+            <TeamCard project={p} />
+          </div>
+        </div>
+      )}
+      {order.includes('files') && (
+        <div className="wg pj-row">
+          <div className="g12">
+            <ProjectPages p={p} slug={slug} />
+          </div>
+        </div>
+      )}
+    </>
+  ) : order.includes('team') || order.includes('files') ? (
       <div className="wg pj-row">
         {order.includes('team') && (
           <div className={(order.includes('files') ? 'g7' : 'g12') + ' secondary'}>
@@ -169,7 +194,7 @@ function ProjectView({ p, slug, next }: { p: Doc; slug: string; next: ReturnType
         )}
         {order.includes('files') && (
           <div className={order.includes('team') ? 'g5' : 'g12'}>
-            <PagesCard p={p} slug={slug} />
+            <ProjectPages p={p} slug={slug} />
           </div>
         )}
       </div>
@@ -345,31 +370,7 @@ function Numbers({ p }: { p: Doc }) {
   )
 }
 
-// ---- Pages card + activity ----
-
-function PagesCard({ p, slug }: { p: Doc; slug: string }) {
-  const { model } = useHQ()
-  const hub = String(p.data.hub || '')
-  const paths = [...new Set([hub, ...list(p.data.docs), ...(model.projectFiles.get(slug) || []).map((d) => d.path)].filter(Boolean))]
-  const docs = paths.map((x) => model.byPath.get(x)).filter(Boolean) as Doc[]
-  return (
-    <Widget id="files" title="Pages" icon="folder" count={docs.length || null}>
-      {docs.length ? (
-        <div className="rows">
-          {docs.map((d) => (
-            <a key={d.path} className="row" href={'#/docs/' + d.path} data-tipt={d.path}>
-              <Icon name="file" size="s" />
-              <span className="t sm">{String(d.data.title || docTitle(d))}</span>
-              {d.path === hub && <span className="chip">main page</span>}
-            </a>
-          ))}
-        </div>
-      ) : (
-        <p className="sm muted">No pages yet. Any note saved in this project’s folder shows up here.</p>
-      )}
-    </Widget>
-  )
-}
+// ---- activity ----
 
 function Activity({ p, slug }: { p: Doc; slug: string }) {
   const { model, source } = useHQ()

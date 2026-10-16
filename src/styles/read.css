@@ -231,3 +231,7 @@ details.dsec>.tg-body{padding:0 0 12px}
 .err-words{display:grid;gap:4px;min-width:0}
 .err-raw summary{cursor:pointer;font-size:var(--t-xs);color:var(--muted)}
 .err-raw code{display:block;font-size:var(--t-xs);color:var(--fg-2);overflow-wrap:anywhere;white-space:normal}
+
+/* Edit a page in place */
+.doc-edit{display:grid;gap:10px;margin-top:8px}
+.doc-ta{width:100%;min-height:60vh;resize:vertical;font:var(--t-sm)/1.55 var(--font-mono);padding:12px;tab-size:2}

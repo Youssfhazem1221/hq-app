@@ -5,7 +5,7 @@ import {
   Database, Ellipsis, ExternalLink, Eye, EyeOff, File as FileIcon, Flag, Focus, Folder, GitCommitHorizontal, Globe, GripVertical,
   HardDrive, History as HistoryIcon, House, Inbox, Info, Keyboard, Layers, LayoutGrid, LayoutPanelLeft, Leaf, Lightbulb,
   Link as LinkIcon, List, LoaderCircle, Lock, LogOut, Map as MapIcon, MapPin, Megaphone, Menu, MessageCircle, MessageSquare, Monitor,
-  OctagonMinus, PanelLeft, Pause, Pin, Play, Plug, Plus, RefreshCw, Route, Search, Send, Settings, SlidersHorizontal, Sparkle,
+  OctagonMinus, PanelLeft, Pause, Pencil, Pin, Play, Plug, Plus, RefreshCw, Route, Search, Send, Settings, SlidersHorizontal, Sparkle,
   SquareCheck, SquareKanban, Star, Sun, Moon, Table2, Target, TriangleAlert, Trophy, Type, Undo2, User, Users, WandSparkles,
   Webhook, X, Zap, type LucideIcon,
 } from 'lucide-react'
@@ -21,7 +21,7 @@ export const ICONS: Record<string, LucideIcon> = {
   keyboard: Keyboard, grid: LayoutGrid, cols: Columns3, list: List, gantt: ChartGantt, link: LinkIcon, commit: GitCommitHorizontal,
   hook: Webhook, gear: Settings, grip: GripVertical, plug: Plug, cloud: Cloud, local: HardDrive, refresh: RefreshCw,
   alert: TriangleAlert, ok: CircleCheckBig, send: Send, logout: LogOut, loader: LoaderCircle, star: Star, target: Target,
-  question: CircleHelp,
+  question: CircleHelp, edit: Pencil,
   // explainer enums
   flag: Flag, route: Route, chart: ChartColumn, users: Users, arrow: ArrowRight, spark: Sparkle, file: FileIcon, folder: Folder,
   db: Database, bell: Bell, pc: Monitor, repo: BookMarked, globe: Globe, lock: Lock, check: Check, clock: Clock, idea: Lightbulb,
