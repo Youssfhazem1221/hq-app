@@ -65,6 +65,18 @@ export async function updateLoop(
   throw new Error(`Not saved after ${tries} tries: ${path} keeps changing. Your text is still in the box.`)
 }
 
+export const BAD_TOKEN_MSG =
+  'The token has a character that can’t be sent (often a space or an invisible character from copy-paste). Copy the token again and paste it once.'
+
+/** A fetch that never got an answer (offline, blocked, a bad header value) → an Error that says so in plain words. */
+export function netError(e: unknown, what = 'GitHub'): Error {
+  const m = String((e as Error)?.message ?? e)
+  if (/ISO-8859-1|Invalid (header )?value|'headers' property/i.test(m)) return new Error(BAD_TOKEN_MSG)
+  if (/^(TypeError: )?(Failed to fetch|Load failed|NetworkError|Network request failed)/i.test(m))
+    return new Error(`Can’t reach ${what} right now (offline, or a blocker or VPN stopped it). Check the connection and try again.`)
+  return e instanceof Error ? e : new Error(m)
+}
+
 /** A readable error for a failed GitHub response. */
 export async function ghError(r: Response) {
   const msg = (await r.text().catch(() => '')).slice(0, 200)

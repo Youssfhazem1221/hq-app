@@ -1,7 +1,8 @@
 // Where the data comes from: the local folder (dev) or the private GitHub repo (deployed).
 import { commitActor } from './people-core'
-import { encPath, excluded, ghError, RepoSync, StaleWriteError, updateLoop, type FileEntry, type UpdateFn } from './sync'
+import { encPath, excluded, ghError, netError, RepoSync, StaleWriteError, updateLoop, type FileEntry, type UpdateFn } from './sync'
 
+export { BAD_TOKEN_MSG } from './sync'
 export { excluded, StaleWriteError, updateLoop, type FileEntry, type UpdateFn }
 /** `configured` (local mode only): false = HQ_LOCAL_LOGIN is not set, so `login` is the default owner login. Local
  *  project writes are refused then; the UI should say "set HQ_LOCAL_LOGIN in .env.local". */
@@ -193,17 +194,22 @@ export class GitHubSource implements Source {
     return this.sync.headSha
   }
 
-  private api(path: string, init: RequestInit = {}) {
-    return fetch('https://api.github.com' + path, {
-      ...init,
-      cache: 'no-store',
-      headers: {
-        Accept: 'application/vnd.github+json',
-        Authorization: `Bearer ${this.c.token}`,
-        'X-GitHub-Api-Version': '2022-11-28',
-        ...(init.headers || {}),
-      },
-    })
+  /** Every GitHub call. No answer at all (offline, blocked, a bad character in the token) → a plain-words error. */
+  private async api(path: string, init: RequestInit = {}) {
+    try {
+      return await fetch('https://api.github.com' + path, {
+        ...init,
+        cache: 'no-store',
+        headers: {
+          Accept: 'application/vnd.github+json',
+          Authorization: `Bearer ${this.c.token}`,
+          'X-GitHub-Api-Version': '2022-11-28',
+          ...(init.headers || {}),
+        },
+      })
+    } catch (e) {
+      throw netError(e)
+    }
   }
   private async json(path: string, init?: RequestInit) {
     const r = await this.api(path, init)

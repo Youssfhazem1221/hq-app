@@ -12,6 +12,7 @@ import { HQContext, PrefsContext, RouteContext, useHQMaybe, type HQCtx } from '.
 import { usePrefs } from './lib/prefs'
 import { focusPageTitle, isTyping, onEscape, rememberFocus, restoreFocus, runEscape, setPaletteReturn } from './lib/focus'
 import { Icon } from './lib/icons'
+import { isStaleChunk, reloadFresh, STALE_MSG } from './lib/net'
 import { Toasts, openCheckin, toast } from './components/toast'
 import { Boundary, PageSnag } from './components/ErrorBoundary'
 import { Sidebar, type PeopleBadge } from './components/shell/Sidebar'
@@ -94,9 +95,14 @@ export default function App() {
   const [peopleBadge, setPeopleBadge] = useState<PeopleBadge>({ count: 0, quiet: false })
 
   useEffect(() => {
-    pickSource().then(setSource)
+    // a stale file already started a reload (main.tsx); the banner says so in case it was held back
+    pickSource()
+      .then(setSource)
+      .catch((e) => setError(isStaleChunk(e) ? STALE_MSG : String(e?.message || e)))
   }, [])
 
+  // `attempt` = the error banner's Retry button
+  const [attempt, setAttempt] = useState(0)
   useEffect(() => {
     if (!source) return
     let off = false
@@ -113,22 +119,25 @@ export default function App() {
     return () => {
       off = true
     }
-  }, [source])
+  }, [source, attempt])
+  const retry = () => (source === undefined ? reloadFresh(true) : setAttempt((a) => a + 1))
 
   // Doorbell: topic from .hq/realtime.json (only if it names this Supabase project). Loaded on demand.
   useEffect(() => {
     if (!source) return
     let off = false
     let b: Doorbell | null = null
-    import('./lib/doorbell').then(({ Doorbell }) => {
-      if (off) return
-      b = new Doorbell(async () => {
-        const rt = await source.realtime()
-        return rt && (!rt.project || rt.project === SUPABASE_REF) ? rt.topic : null
+    import('./lib/doorbell')
+      .then(({ Doorbell }) => {
+        if (off) return
+        b = new Doorbell(async () => {
+          const rt = await source.realtime()
+          return rt && (!rt.project || rt.project === SUPABASE_REF) ? rt.topic : null
+        })
+        b.start()
+        setBell(b)
       })
-      b.start()
-      setBell(b)
-    })
+      .catch(() => { /* live updates are optional: the 60 s check still runs (a stale file reloads in main.tsx) */ })
     return () => {
       off = true
       b?.stop()
@@ -422,16 +431,20 @@ export default function App() {
   }
   const settingsRoute: Route = { page: 'Settings', nav: 'settings', path: '/settings' }
 
+  const loadError = (
+    <div className="alert" role="alert">
+      <Icon name="alert" /> {error}{' '}
+      <button className="btn sm" type="button" onClick={retry}>
+        Retry
+      </button>{' '}
+      · <a href="#/settings">Open Settings</a>
+    </div>
+  )
   let content: React.ReactNode
-  if (source === undefined) content = <Splash text="Starting…" />
+  if (source === undefined) content = error ? loadError : <Splash text="Starting…" />
   else if (source === null) content = <PageView route={settingsRoute} extra={settingsProps} />
   else if (route.page === 'Settings') content = <PageView route={route} extra={settingsProps} />
-  else if (error && !model)
-    content = (
-      <div className="alert" role="alert">
-        <Icon name="alert" /> {error} · <a href="#/settings">Open Settings</a>
-      </div>
-    )
+  else if (error && !model) content = loadError
   else if (!ctx) content = <Splash text="Loading your workspace…" />
   else content = <PageView route={route} extra={settingsProps} />
 
@@ -476,7 +489,7 @@ export default function App() {
               )}
               <main id="main" tabIndex={-1}>
                 <div className="page" data-page={route.page} key={route.path + ':' + remount}>
-                  <Boundary resetKey={route.path + ':' + remount} fallback={(_e, reset) => <PageSnag reset={reset} />}>
+                  <Boundary resetKey={route.path + ':' + remount} fallback={(e, reset) => <PageSnag error={e} reset={reset} />}>
                     {content}
                   </Boundary>
                 </div>

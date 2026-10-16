@@ -6,7 +6,7 @@ import { Icon } from '../lib/icons'
 import { HQ_EVENTS, fire, type IconName, type SettingsPageProps, type UiPrefs } from '../lib/contracts'
 import { useHQMaybe, usePrefsApi } from '../lib/hq-context'
 import { DEFAULT_BRANCH, DEFAULT_REPO } from '../config'
-import { GitHubSource, LocalSource, type GhConfig } from '../lib/source'
+import { BAD_TOKEN_MSG, GitHubSource, LocalSource, type GhConfig } from '../lib/source'
 import { go } from '../lib/router'
 import { store } from '../lib/util'
 import { LABEL, PRESETS, SIZE_PCT, WIDGET_NAME, presetPatch, resolvePrefs, type HomeWidget, type PrefKey } from '../lib/ui-prefs-core'
@@ -103,8 +103,11 @@ export default function Settings({ source, onConnect }: Props) {
   const [busy, setBusy] = useState(false)
   const connect = async () => {
     const [owner, name] = repo.trim().split('/')
-    const cfg: GhConfig = { owner, repo: name, branch: branch.trim() || 'main', token: token.trim() || saved?.token || '' }
+    // spaces, line breaks and invisible characters ride along when a token is copied on a phone
+    const pasted = token.replace(/[\s\u200B-\u200D\u2060\uFEFF]/g, '')
+    const cfg: GhConfig = { owner, repo: name, branch: branch.trim() || 'main', token: pasted || saved?.token || '' }
     if (!owner || !name || !cfg.token) return setMsg('Fill in the repo (owner/name) and a token.')
+    if (/[^\x21-\x7E]/.test(cfg.token)) return setMsg('Could not connect: ' + BAD_TOKEN_MSG)
     setBusy(true)
     setMsg('Checking…')
     try {
@@ -118,7 +121,7 @@ export default function Settings({ source, onConnect }: Props) {
       onConnect(s)
       go('/')
     } catch (e: any) {
-      setMsg('Could not connect: ' + String(e?.message || e).slice(0, 160))
+      setMsg('Could not connect: ' + String(e?.message || e).slice(0, 200))
     } finally {
       setBusy(false)
     }

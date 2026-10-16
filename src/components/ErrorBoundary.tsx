@@ -1,5 +1,6 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react'
 import { Icon } from '../lib/icons'
+import { isStaleChunk, reloadFresh, STALE_MSG } from '../lib/net'
 
 type Fallback = ReactNode | ((error: Error, reset: () => void) => ReactNode)
 type Props = {
@@ -32,13 +33,15 @@ export class Boundary extends Component<Props, State> {
 }
 export default Boundary
 
-/** Page-level fallback: one sentence, one button. */
-export function PageSnag({ reset }: { reset?: () => void }) {
+/** Page-level fallback: one sentence, one button. A page file gone after a deploy gets a real reload (a retry would
+ *  ask for the same missing file again). */
+export function PageSnag({ error, reset }: { error?: unknown; reset?: () => void }) {
+  const stale = isStaleChunk(error)
   return (
     <div className="empty snag" role="alert">
       <Icon name="alert" />
-      <p>This page hit a snag.</p>
-      <button className="btn" type="button" onClick={() => (reset ? reset() : location.reload())}>
+      <p>{stale ? STALE_MSG : 'This page hit a snag.'}</p>
+      <button className="btn" type="button" onClick={() => (stale ? reloadFresh(true) : reset ? reset() : location.reload())}>
         <Icon name="refresh" size="s" />
         Reload
       </button>
