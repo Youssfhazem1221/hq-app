@@ -188,7 +188,7 @@ section+section>.grp,.gallery+section>.grp{margin-top:18px}
 .journey .tl li.done .nd.ck{background:var(--accent);border-color:var(--accent);color:#fff}
 
 /* Project board (a project's board: lanes of cards) */
-.pb-lanes{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(190px,1fr);gap:10px;overflow-x:auto;padding-bottom:6px;scroll-snap-type:x proximity}
+.pb-lanes{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(168px,1fr);gap:10px;overflow-x:auto;padding-bottom:6px;scroll-snap-type:x proximity}
 .pb-lane{background:var(--pane-2);border-radius:12px;padding:10px;display:grid;align-content:start;gap:8px;min-width:0;scroll-snap-align:start}
 .pb-h{display:flex;align-items:center;gap:8px;margin:0 2px 2px;font-size:var(--t-xs);font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--fg-2)}
 .pb-card{background:var(--raise);border:1px solid var(--line);border-radius:10px;padding:10px;display:grid;gap:6px;min-width:0}
