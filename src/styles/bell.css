@@ -1,0 +1,27 @@
+/* bell.css · the top bar's bell (board notifications) and its list. Loads with the Bell chunk. Tokens only.
+   Unread = accent (count pill, dot, icon wash); read rows step back to --fg-2. Calm mode: a quiet dot, no swing. */
+.nb-i{display:inline-grid;transform-origin:50% 3px}
+.nb-i.ring{animation:nb-ring calc(var(--dur-4)*2) var(--ease)}
+@keyframes nb-ring{15%{transform:rotate(16deg)}30%{transform:rotate(-13deg)}45%{transform:rotate(9deg)}60%{transform:rotate(-6deg)}75%{transform:rotate(3deg)}}
+.nb-n{position:absolute;top:1px;right:0;min-width:16px;height:16px;padding:0 4px;border-radius:var(--r-pill);background:var(--accent);color:var(--on-accent);font:650 10px/16px var(--font-ui);text-align:center;box-shadow:0 0 0 2px var(--bg);pointer-events:none}
+:root[data-calm="on"] .nb-n{font-size:0;min-width:8px;width:8px;height:8px;padding:0;top:5px;right:5px}
+:root[data-calm="on"] .nb-i.ring{animation:none}
+
+.nb-pop{padding:0;gap:0;overflow:hidden}
+.nb-h{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 8px 8px 14px;border-bottom:1px solid var(--line)}
+.nb-h h2{margin:0;font-size:var(--t-sm);font-weight:650;letter-spacing:0}
+.nb-list{list-style:none;margin:0;padding:4px;max-height:min(60vh,440px);overflow:auto;overscroll-behavior:contain}
+.nb-it{display:grid;grid-template-columns:28px minmax(0,1fr) 8px;gap:10px;padding:8px;border-radius:var(--r-sm);color:var(--fg-2);font-size:var(--t-sm);line-height:1.4}
+.nb-it:hover,.nb-it:focus-visible{background:var(--hover);text-decoration:none}
+.nb-ic{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:var(--pane-2);color:var(--muted)}
+.nb-it.un .nb-ic{background:var(--accent-wash);color:var(--accent-ink)}
+.nb-tx{display:grid;gap:2px;min-width:0}
+.nb-l{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
+.nb-l b{font-weight:600}
+.nb-it.un .nb-l{color:var(--fg)}
+.nb-s{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted)}
+.nb-m{font-size:var(--t-xs);color:var(--muted)}
+.nb-dot{width:8px;height:8px;margin-top:10px;border-radius:50%;background:var(--accent)}
+.nb-more{width:100%;justify-content:center}
+.nb-empty{padding:28px 20px}
+.nb-f{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0;padding:10px 14px;border-top:1px solid var(--line);background:var(--pane);font-size:var(--t-xs);color:var(--fg-2)}

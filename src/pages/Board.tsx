@@ -8,6 +8,7 @@ import { Icon } from '../lib/icons'
 import { HQ_EVENTS, type IconName, type NextItem, type PageProps } from '../lib/contracts'
 import { displayName, postMessage, postReply, projectSlug, setPostStatus } from '../lib/hq'
 import { answerJoin, answerLeave, forYouFor } from '../lib/people'
+import { postFromHash } from '../lib/notify-core'
 import type { Doc } from '../lib/md'
 import { onEscape } from '../lib/focus'
 import { ago, store } from '../lib/util'
@@ -36,7 +37,10 @@ const isTrue = (v: unknown) => v === true || str(v).toLowerCase() === 'true'
 const postId = (m: Doc) => str(m.data.id) || m.path.split('/').pop()!.replace(/\.md$/i, '')
 const errText = (e: unknown) => String((e as Error)?.message || e).split('\n')[0].slice(0, 160)
 
-type Focus = { id: string; mode: 'reply' | 'answer'; n: number } | null
+/** reply: open the reply box · answer: a request's buttons · view: a notification's link (replies open, the post lights up). */
+type Focus = { id: string; mode: 'reply' | 'answer' | 'view'; n: number } | null
+/** How long a linked post stays lit. */
+const LIT_MS = 2400
 
 export default function Board(_: PageProps) {
   const { model, me, source, reload } = useHQ()
@@ -89,6 +93,23 @@ export default function Board(_: PageProps) {
     addEventListener(HQ_EVENTS.newItem, f)
     return () => removeEventListener(HQ_EVENTS.newItem, f)
   }, [])
+
+  // A notification's link (#/board?post=<id>): show that post. The query is dropped again, so a reload stays calm.
+  useEffect(() => {
+    const look = () => {
+      const id = postFromHash(location.hash)
+      if (!id) return
+      history.replaceState(null, '', '#/board')
+      const at = posts.findIndex((p) => postId(p) === id)
+      if (at < 0) return toast('That post is gone (deleted or moved)', 'info')
+      setFilter('all')
+      setLimit((n) => Math.max(n, at + 1))
+      setFocus({ id, mode: 'view', n: Date.now() })
+    }
+    look()
+    addEventListener('hashchange', look)
+    return () => removeEventListener('hashchange', look)
+  }, [posts])
 
   // A prefill ("Post to board" from an answer) opens the composer with it.
   useEffect(() => {
@@ -303,6 +324,7 @@ function Post({ m, owners, focus }: { m: Doc; owners: Map<string, string>; focus
   const [busy, setBusy] = useState(false)
   const box = useRef<HTMLInputElement>(null)
   const self = useRef<HTMLElement>(null)
+  const [lit, setLit] = useState(false)
   // the doorbell's bridge state (re-render on bridge events)
   const [, setTick] = useState(0)
   useEffect(() => (flagged && bell ? bell.subscribe(() => setTick((n) => n + 1)) : undefined), [flagged, bell])
@@ -310,6 +332,13 @@ function Post({ m, owners, focus }: { m: Doc; owners: Map<string, string>; focus
   useEffect(() => {
     if (!focus) return
     self.current?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    if (focus.mode === 'view') {
+      if (replies.length) setShowReplies(true)
+      self.current?.focus({ preventScroll: true })
+      setLit(true)
+      const t = setTimeout(() => setLit(false), LIT_MS)
+      return () => clearTimeout(t)
+    }
     if (focus.mode === 'reply') {
       setShowReplies(true)
       setTimeout(() => box.current?.focus({ preventScroll: true }), 50)
@@ -339,7 +368,7 @@ function Post({ m, owners, focus }: { m: Doc; owners: Map<string, string>; focus
   const stage = flagged ? trackerStage({ id, path: m.path, status: m.data.status, closedBy: m.data.closed_by }, replies.some((r) => isClaudeReply(r.data)), bell?.bridge, bell?.working) : null
 
   return (
-    <article ref={self} className={'post' + (done ? ' is-done' : '')} id={'post-' + id} aria-labelledby={'ph-' + id}>
+    <article ref={self} className={'post' + (done ? ' is-done' : '') + (lit ? ' is-lit' : '')} id={'post-' + id} aria-labelledby={'ph-' + id} tabIndex={-1}>
       <Avatar name={name} bot={claude} size={36} />
       <div className="p-main">
         <div className="ph2" id={'ph-' + id}>

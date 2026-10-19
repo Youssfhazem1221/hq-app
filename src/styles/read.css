@@ -66,6 +66,9 @@ a.srcchip:hover{border-color:var(--accent);text-decoration:none}
 .board-page .post .body{margin-top:6px;font-size:var(--t-md);color:var(--fg-2);min-width:0;overflow-wrap:anywhere}
 .board-page .post .body .md>p{margin:0 0 6px}
 .board-page .post.is-done .body,.board-page .post.is-done .ph2 b{color:var(--muted)}
+/* a notification's link lands here: the post is lit for a moment, then fades back */
+.board-page .post{transition:background var(--dur-4),box-shadow var(--dur-4)}
+.board-page .post.is-lit{background:var(--accent-wash);box-shadow:0 0 0 10px var(--accent-wash);border-radius:2px}
 .board-page .typeic{display:inline-flex;align-items:center;gap:5px}
 .board-page .chip.pj{text-decoration:none;color:var(--fg-2)}
 .board-page .chip.pj:hover{text-decoration:none;border-color:var(--accent)}

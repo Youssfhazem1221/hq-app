@@ -1,11 +1,16 @@
-// Top bar (48 px, sticky): ☰ (phone) · breadcrumbs (phone: current page only) · sync dot · Ask · Adjust look · theme.
-import { useEffect, useState, useSyncExternalStore } from 'react'
+// Top bar (48 px, sticky): ☰ (phone) · breadcrumbs (phone: current page only) · sync dot · Ask · Adjust look · bell ·
+// theme.
+import { lazy, Suspense, useEffect, useState, useSyncExternalStore } from 'react'
 import { Icon } from '../../lib/icons'
 import { useHQMaybe, useIsDark, usePrefsApi } from '../../lib/hq-context'
 import type { Doorbell } from '../../lib/doorbell'
 import type { Source } from '../../lib/source'
 import type { Crumb } from './shell-core'
 import { MOD_KEY } from './Sidebar'
+import { Boundary } from '../ErrorBoundary'
+
+// The bell (board notifications) is its own chunk; an empty 30 px button holds its place, so nothing shifts.
+const Bell = lazy(() => import('./Bell'))
 
 type Props = {
   crumbs: Crumb[]
@@ -96,6 +101,13 @@ export function TopBar(p: Props) {
         <Icon name="wand" size="s" />
         <span className="hide-m">Adjust look</span>
       </button>
+      {p.source && (
+        <Boundary fallback={null}>
+          <Suspense fallback={<span className="icon-btn" aria-hidden="true" />}>
+            <Bell />
+          </Suspense>
+        </Boundary>
+      )}
       <button className="icon-btn" type="button" onClick={toggleTheme} aria-label={dark ? 'Switch to light' : 'Switch to dark'} data-tipt={dark ? 'Light theme' : 'Dark theme'}>
         <Icon name={dark ? 'sun' : 'moon'} />
       </button>

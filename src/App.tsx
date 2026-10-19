@@ -1,7 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { FileEntry, GhConfig, Me, Source } from './lib/source'
 import { buildModel, displayName } from './lib/hq'
-import { humanChange } from './lib/changes'
 import type { Doorbell } from './lib/doorbell'
 import { slugOf, zonedParts } from './lib/people-core'
 import { SUPABASE_REF } from './config'
@@ -70,10 +69,13 @@ function focusTitleSoon() {
     if (focusPageTitle()) obs.disconnect()
   })
   obs.observe(main, { childList: true, subtree: true })
-  // A page without an h1 (old pages): land in <main> so the next Tab starts in the content.
+  // A page without an h1 (old pages): land in <main> so the next Tab starts in the content. Focus the page moved on
+  // its own in the meantime (a notification's linked post, a field you clicked) stays where it is.
   setTimeout(() => {
     obs.disconnect()
-    if (!focusPageTitle() && (!document.activeElement || document.activeElement === document.body)) main.focus({ preventScroll: true })
+    const a = document.activeElement
+    if (a && a !== document.body && a !== main) return
+    if (!focusPageTitle()) main.focus({ preventScroll: true })
   }, 1500)
 }
 
@@ -192,8 +194,8 @@ export default function App() {
       if (source.kind === 'local') return toast('Files changed on this PC', 'local')
       const c = await source.latest().catch(() => null)
       const m = modelRef.current
-      // human words, never the raw commit subject (no tool prefixes or file ids)
-      if (c) toast(humanChange(c, (l) => (m ? displayName(m, l) : l)), 'commit')
+      // human words, never the raw commit subject (no tool prefixes or file ids); the wording loads on demand (entry budget)
+      if (c) toast((await import('./lib/changes')).humanChange(c, (l) => (m ? displayName(m, l) : l)), 'commit')
     }
     running.current = (async () => {
       do {
