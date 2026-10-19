@@ -18,8 +18,9 @@ import { MapView } from './MapView'
 import { Compare } from './Compare'
 import { Cards } from './Cards'
 import { Timeline } from './Timeline'
+import { Network, StateMachine } from './Graph'
 
-export const TYPE_ICON: Record<ExType, IconName> = { flow: 'route', map: 'map', cards: 'layers', timeline: 'cal', compare: 'table' }
+export const TYPE_ICON: Record<ExType, IconName> = { flow: 'route', map: 'map', cards: 'layers', timeline: 'cal', compare: 'table', statemachine: 'commit', network: 'hook' }
 export const WHAT_IS_THIS = 'An explainer: a picture written as a small JSON block in a note'
 
 type Props = {
@@ -51,6 +52,10 @@ function Body({ spec, ctx }: { spec: ExplainerSpec; ctx?: Props['ctx'] }) {
       return <Cards spec={spec} />
     case 'timeline':
       return <Timeline spec={spec} />
+    case 'statemachine':
+      return <StateMachine spec={spec} />
+    case 'network':
+      return <Network spec={spec} />
     default:
       return null
   }

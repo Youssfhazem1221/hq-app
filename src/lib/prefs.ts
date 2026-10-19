@@ -149,14 +149,11 @@ export function uiFileEdit(login: string, changed: Partial<UiPrefs>, iso: string
   }
 }
 
-const FONT_URL: Record<string, string> = { lexend: 'Lexend:wght@400..700', atkinson: 'Atkinson+Hyperlegible:wght@400;700' }
+const FONT_URL: Record<string, string> = { lexend: 'Lexend:wght@400..700', atkinson: 'Atkinson+Hyperlegible+Next:wght@200..800' }
 function loadFont(font: string) {
-  if (!FONT_URL[font] || document.getElementById('font-' + font)) return
-  const l = document.createElement('link')
-  l.id = 'font-' + font
-  l.rel = 'stylesheet'
-  l.href = `https://fonts.googleapis.com/css2?family=${FONT_URL[font]}&display=swap`
-  document.head.appendChild(l)
+  const id = 'font-' + font
+  if (!FONT_URL[font] || document.getElementById(id)) return
+  document.head.appendChild(Object.assign(document.createElement('link'), { id, rel: 'stylesheet', href: `https://fonts.googleapis.com/css2?family=${FONT_URL[font]}&display=swap` }))
 }
 
 /** Put a look on <html>: enum data-* attributes only (data-theme resolved light|dark, data-theme-pref, and every

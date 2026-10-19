@@ -14,15 +14,17 @@
   --s1:calc(4px*var(--d)); --s2:calc(8px*var(--d)); --s3:calc(12px*var(--d)); --s4:calc(16px*var(--d));
   --s5:calc(20px*var(--d)); --s6:calc(24px*var(--d)); --s8:calc(32px*var(--d)); --s10:calc(40px*var(--d)); --s14:calc(56px*var(--d));
   --r-xs:6px; --r-sm:8px; --r:12px; --r-lg:16px; --r-pill:999px;
-  --e1:0 1px 2px rgba(0,0,0,.05);
-  --e2:0 1px 2px rgba(0,0,0,.05),0 10px 30px rgba(0,0,0,.08);
-  --e3:0 2px 6px rgba(0,0,0,.06),0 24px 64px rgba(0,0,0,.18);
+  --e1:0 1px 2px rgba(20,20,45,.05),0 2px 6px rgba(20,20,45,.03);
+  --e2:0 1px 2px rgba(20,20,45,.05),0 10px 30px rgba(20,20,45,.09);
+  --e3:0 2px 6px rgba(20,20,45,.06),0 24px 64px rgba(20,20,45,.18);
   --ease:cubic-bezier(.2,.8,.2,1);
   --dur-1:120ms; --dur-2:180ms; --dur-3:260ms; --dur-4:420ms;
   --sbw:252px;
-  /* light neutrals */
-  --bg:#ffffff; --side:#f7f7f7; --pane:#f6f6f6; --pane-2:#ececec; --raise:#ffffff; --hover:rgba(0,0,0,.045); --press:rgba(0,0,0,.07);
-  --fg:#222222; --fg-2:#454545; --muted:#6a6a6a; --line:#e8e8e8; --line-2:#d4d4d4; --scrim:rgba(15,15,15,.32);
+  /* light neutrals: a layered ground (cards are white on a faintly tinted canvas). --tint = the accent's hue, so the
+     whole room leans toward the chosen accent (3% light · 5% dark); text stays neutral. */
+  --tint:var(--accent);
+  --bg:color-mix(in oklab,#f8f8fa 97%,var(--tint)); --side:color-mix(in oklab,#f1f1f4 96%,var(--tint)); --pane:color-mix(in oklab,#f3f3f6 97%,var(--tint)); --pane-2:color-mix(in oklab,#e9e9ee 96%,var(--tint)); --raise:#ffffff; --hover:rgba(20,20,40,.045); --press:rgba(20,20,40,.075);
+  --fg:#1c1c21; --fg-2:#45464d; --muted:#62646c; --line:rgba(20,20,45,.09); --line-2:rgba(20,20,45,.16); --scrim:rgba(15,15,20,.32);
   /* accent (violet default): fill (white text, AA) · ink (text) · wash */
   --accent:#7c5cec; --accent-ink:#5b3fd0; --accent-wash:#efeafe; --on-accent:#ffffff;
   /* status (state only, always icon + word; never series colours) */
@@ -34,13 +36,13 @@
   --seq-1:#cde2fb; --seq-2:#9ec5f4; --seq-3:#5598e7; --seq-4:#2a78d6; --seq-5:#184f95;
   --grid:#ececec; --axis:#d0d0d0;
   /* meaningful marks >= 3:1: 'later' beads/nodes, context points, dashed tracks */
-  --mark-empty:#8c8c8c; --mark-ctx:#8c8c8c;
+  --mark-empty:#85858a; --mark-ctx:#85858a;
   color-scheme:light;
 }
 @media (prefers-color-scheme:dark){
   :root:not([data-theme="light"]){
-    --bg:#1e1e1e; --side:#191919; --pane:#252525; --pane-2:#2e2e2e; --raise:#262626; --hover:rgba(255,255,255,.055); --press:rgba(255,255,255,.09);
-    --fg:#dcddde; --fg-2:#b8b9ba; --muted:#9a9a9a; --line:#323232; --line-2:#454545; --scrim:rgba(0,0,0,.55);
+    --bg:color-mix(in oklab,#16171a 95%,var(--tint)); --side:color-mix(in oklab,#111215 95%,var(--tint)); --pane:color-mix(in oklab,#1b1c20 95%,var(--tint)); --pane-2:color-mix(in oklab,#27282e 95%,var(--tint)); --raise:color-mix(in oklab,#1e1f24 95%,var(--tint)); --hover:rgba(255,255,255,.05); --press:rgba(255,255,255,.085);
+    --fg:#e8e9ed; --fg-2:#babcc4; --muted:#9396a0; --line:rgba(255,255,255,.075); --line-2:rgba(255,255,255,.14); --scrim:rgba(0,0,0,.55);
     --accent-ink:#ad93fb; --accent-wash:rgba(139,108,239,.18);
     --ok:#44cf6e; --ok-ink:#6ad98a; --ok-wash:rgba(68,207,110,.13);
     --warn:#e0ac00; --warn-ink:#ebbf3c; --warn-wash:rgba(224,172,0,.14);
@@ -48,13 +50,13 @@
     --viz-1:#3987e5; --viz-2:#d95926; --viz-3:#199e70; --viz-4:#c98500; --viz-5:#d55181; --viz-6:#008300; --viz-7:#9085e9; --viz-8:#e66767;
     --seq-1:#184f95; --seq-2:#256abf; --seq-3:#3987e5; --seq-4:#6da7ec; --seq-5:#b7d3f6;
     --grid:#303030; --axis:#4a4a4a; --mark-empty:#7a7a7a; --mark-ctx:#7a7a7a;
-    --e1:0 1px 2px rgba(0,0,0,.4); --e2:0 1px 2px rgba(0,0,0,.4),0 12px 32px rgba(0,0,0,.45); --e3:0 2px 8px rgba(0,0,0,.5),0 24px 64px rgba(0,0,0,.6);
+    --e1:inset 0 1px 0 rgba(255,255,255,.04),0 1px 2px rgba(0,0,0,.35); --e2:inset 0 1px 0 rgba(255,255,255,.05),0 1px 2px rgba(0,0,0,.4),0 12px 32px rgba(0,0,0,.45); --e3:inset 0 1px 0 rgba(255,255,255,.06),0 2px 8px rgba(0,0,0,.5),0 24px 64px rgba(0,0,0,.6);
     color-scheme:dark;
   }
 }
 :root[data-theme="dark"]{
-  --bg:#1e1e1e; --side:#191919; --pane:#252525; --pane-2:#2e2e2e; --raise:#262626; --hover:rgba(255,255,255,.055); --press:rgba(255,255,255,.09);
-  --fg:#dcddde; --fg-2:#b8b9ba; --muted:#9a9a9a; --line:#323232; --line-2:#454545; --scrim:rgba(0,0,0,.55);
+  --bg:color-mix(in oklab,#16171a 95%,var(--tint)); --side:color-mix(in oklab,#111215 95%,var(--tint)); --pane:color-mix(in oklab,#1b1c20 95%,var(--tint)); --pane-2:color-mix(in oklab,#27282e 95%,var(--tint)); --raise:color-mix(in oklab,#1e1f24 95%,var(--tint)); --hover:rgba(255,255,255,.05); --press:rgba(255,255,255,.085);
+  --fg:#e8e9ed; --fg-2:#babcc4; --muted:#9396a0; --line:rgba(255,255,255,.075); --line-2:rgba(255,255,255,.14); --scrim:rgba(0,0,0,.55);
   --accent-ink:#ad93fb; --accent-wash:rgba(139,108,239,.18);
   --ok:#44cf6e; --ok-ink:#6ad98a; --ok-wash:rgba(68,207,110,.13);
   --warn:#e0ac00; --warn-ink:#ebbf3c; --warn-wash:rgba(224,172,0,.14);
@@ -62,7 +64,7 @@
   --viz-1:#3987e5; --viz-2:#d95926; --viz-3:#199e70; --viz-4:#c98500; --viz-5:#d55181; --viz-6:#008300; --viz-7:#9085e9; --viz-8:#e66767;
   --seq-1:#184f95; --seq-2:#256abf; --seq-3:#3987e5; --seq-4:#6da7ec; --seq-5:#b7d3f6;
   --grid:#303030; --axis:#4a4a4a; --mark-empty:#7a7a7a; --mark-ctx:#7a7a7a;
-  --e1:0 1px 2px rgba(0,0,0,.4); --e2:0 1px 2px rgba(0,0,0,.4),0 12px 32px rgba(0,0,0,.45); --e3:0 2px 8px rgba(0,0,0,.5),0 24px 64px rgba(0,0,0,.6);
+  --e1:inset 0 1px 0 rgba(255,255,255,.04),0 1px 2px rgba(0,0,0,.35); --e2:inset 0 1px 0 rgba(255,255,255,.05),0 1px 2px rgba(0,0,0,.4),0 12px 32px rgba(0,0,0,.45); --e3:inset 0 1px 0 rgba(255,255,255,.06),0 2px 8px rgba(0,0,0,.5),0 24px 64px rgba(0,0,0,.6);
   color-scheme:dark;
 }
 
@@ -77,13 +79,13 @@
   :root:not([data-theme="light"])[data-accent="green"]{--accent-ink:#6ad98a;--accent-wash:rgba(27,125,68,.24)}
   :root:not([data-theme="light"])[data-accent="amber"]{--accent-ink:#f0b45a;--accent-wash:rgba(180,95,6,.24)}
   :root:not([data-theme="light"])[data-accent="rose"]{--accent-ink:#f39abb;--accent-wash:rgba(209,56,110,.22)}
-  :root:not([data-theme="light"])[data-accent="slate"]{--accent-ink:#b9c0cc;--accent-wash:rgba(138,147,163,.2)}
+  :root:not([data-theme="light"])[data-accent="slate"]{--accent:#dfe3ea;--on-accent:#16181c;--accent-ink:#c9cfda;--accent-wash:rgba(160,170,190,.15);--tint:#5b6475}
 }
 :root[data-theme="dark"][data-accent="blue"]{--accent-ink:#8fb6f5;--accent-wash:rgba(47,111,219,.2)}
 :root[data-theme="dark"][data-accent="green"]{--accent-ink:#6ad98a;--accent-wash:rgba(27,125,68,.24)}
 :root[data-theme="dark"][data-accent="amber"]{--accent-ink:#f0b45a;--accent-wash:rgba(180,95,6,.24)}
 :root[data-theme="dark"][data-accent="rose"]{--accent-ink:#f39abb;--accent-wash:rgba(209,56,110,.22)}
-:root[data-theme="dark"][data-accent="slate"]{--accent-ink:#b9c0cc;--accent-wash:rgba(138,147,163,.2)}
+:root[data-theme="dark"][data-accent="slate"]{--accent:#dfe3ea;--on-accent:#16181c;--accent-ink:#c9cfda;--accent-wash:rgba(160,170,190,.15);--tint:#5b6475}
 
 /* project colour = `color: 1..8` → slot class (never an inline value from data) */
 /* (pc1-pc8, not c1-c8: the grid span classes .c4-.c12 in components.css must never set a colour) */
@@ -94,7 +96,7 @@
 :root[data-size="s"]{--fs:.9} :root[data-size="l"]{--fs:1.1} :root[data-size="xl"]{--fs:1.2} :root[data-size="xxl"]{--fs:1.35}
 :root[data-density="compact"]{--d:.82} :root[data-density="spacious"]{--d:1.2}
 :root[data-font="lexend"]{--font-ui:"Lexend",system-ui,sans-serif}
-:root[data-font="atkinson"]{--font-ui:"Atkinson Hyperlegible",system-ui,sans-serif}
+:root[data-font="atkinson"]{--font-ui:"Atkinson Hyperlegible Next","Atkinson Hyperlegible",system-ui,sans-serif}
 :root[data-font="system"]{--font-ui:system-ui,-apple-system,"Segoe UI",sans-serif}
 :root[data-lh="relaxed"]{--lh:1.75} :root[data-lh="loose"]{--lh:1.95}
 :root[data-ls="wide"]{--ls:.02em}
@@ -104,7 +106,7 @@
 :root[data-contrast="high"] :focus-visible{outline-width:3px}
 :root[data-calm="on"] .nav .badge{font-size:0;min-width:8px;width:8px;height:8px;padding:0;background:var(--muted)}
 :root[data-calm="on"] .st,:root[data-calm="on"] .chip.ok,:root[data-calm="on"] .chip.warn{background:var(--pane-2);color:var(--fg-2)}
-:root[data-calm="on"] .nextbar.hero{background:var(--pane)}
+:root[data-calm="on"] .nextbar.hero{background:var(--raise)}
 :root[data-focus="on"] .w[data-secondary],:root[data-focus="on"] .secondary{display:none}
 :root[data-focus="on"] .grid>*{grid-column:span 12}
 :root[data-motion="reduced"] *,:root[data-motion="reduced"] *::before,:root[data-motion="reduced"] *::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important;scroll-behavior:auto!important}

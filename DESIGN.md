@@ -1,6 +1,7 @@
 # HQ design system (v3)
 
-> **Answer first:** one calm "Notion × Obsidian" look. White / near-black canvas, violet ink, hairlines, 12 px radius, Inter.
+> **Answer first:** one calm "Notion × Obsidian" look. A layered canvas (lit cards on a ground faintly tinted by the accent),
+> violet ink, hairlines, 12 px radius, Inter.
 > Every screen leads with **one Next item with one button**, then pictures. Prefs only ever reach the page as **enum
 > `data-*` attributes** on `<html>`. Written from the built tokens in `src/styles/tokens.css` (the source of truth).
 
@@ -18,15 +19,19 @@
 
 | Token | Light | Dark | Job |
 |---|---|---|---|
-| `--bg` · `--side` · `--pane` · `--pane-2` · `--raise` | `#fff` · `#f7f7f7` · `#f6f6f6` · `#ececec` · `#fff` | `#1e1e1e` · `#191919` · `#252525` · `#2e2e2e` · `#262626` | surfaces |
-| `--fg` · `--fg-2` · `--muted` | `#222` · `#454545` · `#6a6a6a` | `#dcddde` · `#b8b9ba` · `#9a9a9a` | text (AA on every surface) |
-| `--line` · `--line-2` | `#e8e8e8` · `#d4d4d4` | `#323232` · `#454545` | hairlines, input borders |
-| `--accent` · `--accent-ink` · `--accent-wash` | `#7c5cec` · `#5b3fd0` · `#efeafe` | fill same · `#ad93fb` · violet 18% | fill (white text ≥ 4.5:1) · text · wash |
+| `--bg` · `--side` · `--pane` · `--pane-2` | `#f8f8fa` · `#f1f1f4` · `#f3f3f6` · `#e9e9ee`, each 3–4% `--tint` | `#16171a` · `#111215` · `#1b1c20` · `#27282e`, each 5% `--tint` | surfaces: `color-mix(in oklab, grey, var(--tint))` |
+| `--raise` | `#fff` | `#1e1f24` + 5% `--tint` | cards: lighter than the ground in both themes |
+| `--tint` | the accent fill | same (slate keeps `#5b6475`) | the hue the whole room leans toward |
+| `--fg` · `--fg-2` · `--muted` | `#1c1c21` · `#45464d` · `#62646c` | `#e8e9ed` · `#babcc4` · `#9396a0` | text (AA on every surface, every tint) |
+| `--line` · `--line-2` | ink at 9% · 16% | white at 7.5% · 14% | hairlines, input borders (alpha, so they sit on any surface) |
+| `--accent` · `--accent-ink` · `--accent-wash` | `#7c5cec` · `#5b3fd0` · `#efeafe` | fill same · `#ad93fb` · violet 18% | fill (`--on-accent` text ≥ 4.5:1) · text · wash |
 | `--ok` · `--warn` · `--bad` (+ `-ink`, `-wash`) | `#1f8a4c` · `#b87400` · `#d1343a` | `#44cf6e` · `#e0ac00` · `#fb464c` | state only, always icon + word |
-| `--mark-empty` · `--mark-ctx` | `#8c8c8c` | `#7a7a7a` | "later" beads/nodes, context points, dashed tracks (≥ 3:1) |
+| `--mark-empty` · `--mark-ctx` | `#85858a` | `#7a7a7a` | "later" beads/nodes, context points, dashed tracks (≥ 3:1 on every tinted surface) |
 | `--viz-1` … `--viz-8` | dataviz slots | re-tuned for dark | chart series = project colours |
 
 - **Accents** (`data-accent`): violet (default) · blue · green · amber · rose · slate. Each has fill, ink, wash for both themes.
+  Slate in dark is the one light fill (`#dfe3ea`, dark `--on-accent`), so primary buttons never look disabled; every
+  accent fill uses `--on-accent` for its text, checkmarks and switch knob.
 - **Project colour** = `color: 1..8` in `project.md` → class **`pc1`…`pc8`** (sets `--pc`). Never an inline value, never
   derived from a slug; anything invalid = slot 1. (`c4`–`c12` are grid spans, so the slots are `pcN`.)
 - Visuals use their own `--vc` (accent, or the project slot when the component carries `has-pc pcN`).
@@ -40,7 +45,8 @@
 | `--t-lg` · `--t-xl` | 17 · 20 px | lead lines · hero Next sentence, stat values |
 | `--t-2xl` · `--t-3xl` | 24 · 32 px | phone page title · page title (750, -0.025em) |
 
-- Fonts: `--font-ui` = **Inter** (the only font loaded up front). Lexend / Atkinson Hyperlegible load only when chosen.
+- Fonts: `--font-ui` = **Inter** (the only font loaded up front). Lexend / Atkinson Hyperlegible **Next** (variable 200–800, so
+  the 500–750 weights are real) load only when chosen.
   Code = the system mono stack (`--font-mono`).
 - `--fs` scales everything (`data-size` s 90% · m 100% · l 110% · xl 120% · xxl 135%); `--lh` 1.55 / 1.75 / 1.95;
   `--ls` 0 / .02em.
@@ -51,7 +57,7 @@
 |---|---|
 | Space (4-base × density `--d`: compact .82 · comfy 1 · spacious 1.2) | `--s1` 4 · `--s2` 8 · `--s3` 12 · `--s4` 16 · `--s5` 20 · `--s6` 24 · `--s8` 32 · `--s10` 40 · `--s14` 56 |
 | Radius | `--r-xs` 6 · `--r-sm` 8 · `--r` 12 · `--r-lg` 16 · `--r-pill` 999 |
-| Elevation | `--e1` (cards) · `--e2` (popovers, toasts) · `--e3` (palette, sheets) |
+| Elevation | `--e1` (cards, buttons, tiles) · `--e2` (popovers, toasts) · `--e3` (palette, sheets). Dark adds a 1 px top highlight (lit edge) |
 | Motion | `--dur-1` 120 · `--dur-2` 180 · `--dur-3` 260 · `--dur-4` 420 ms · `--ease` cubic-bezier(.2,.8,.2,1) |
 
 - One authored moment: **Next completion** = the bar fills for 520 ms (`NEXT_FILL_MS`), then the next item.
@@ -92,7 +98,8 @@ Stored per person in `people/<slug>/ui.md` (flat frontmatter, non-default keys o
 | `Markdown` | `components/ui.tsx` | ```` ```chart ```` / ```` ```explainer ```` through `components/blocks.tsx`: ≤ 4 rich blocks per doc or answer, each in an error boundary whose fallback is its code |
 | Popover · palette · toasts | `components/shell/*`, `components/toast.tsx` | Esc closes the newest surface first; toasts: one line + Undo, 6 s, max 2 |
 | Journey · Beads · Scatter · GoalMeter · WeekDots · Heatmap · StatusBoard | `components/visuals/*` | beads in cards = one `role=img`; journey nodes 24 px with roving focus; scatter hit circles 36 px; every chart has a Table twin |
-| Explainers (flow · map · cards · timeline · compare) | `components/explainers/*` | total parser (12 KB cap, never throws); text only, never HTML from data |
+| Explainers (flow · map · cards · timeline · compare · statemachine · network) | `components/explainers/*` | total parser (12 KB cap, never throws); text only, never HTML from data; the two graphs lay themselves out (`graph-layout.ts`) |
+| Home Next hero | `components.css` `.nextbar.hero` | the headline card: raised, accent-lit from the top-left, 24 px sentence (calm = plain raised card) |
 
 ## 7. Accessibility floor
 

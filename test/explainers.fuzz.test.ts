@@ -1,5 +1,5 @@
 // B1 + B2: the ```explainer parser is TOTAL. Port of the design mock's fuzz (tools/fuzz-explainer.mjs, same seeded
-// generator): 1,000 shapes (60% near-valid), parse never throws, every cap holds, no html survives, the map
+// generator): 1,400 shapes (60% near-valid), parse never throws, every cap holds, no html survives, the map
 // geometry and the code fallback never throw, a 13 KB block → null, and the 5th rich block → code. Plus the
 // critique's crash inputs and the hardenings over the mock (prototype-named ids, source segments, control chars).
 import test from 'node:test'
@@ -10,6 +10,7 @@ import { app } from './helpers.ts'
 import { loadTsx } from './tsx.ts'
 
 const X = await app('components/explainers/parse')
+const G = await app('components/explainers/graph-layout')
 const L = X.EX_LIMITS
 // Like the mock's srcExists: known pages + any file inside a project folder.
 const exists = (p: string) => p === 'technical.md' || /^projects\/[a-z0-9-]+\/[\w.-]+\.md$/.test(p)
@@ -27,7 +28,7 @@ const rnd = () => {
   return ((t ^ (t >>> 14)) >>> 0) / 4294967296
 }
 const pick = <T>(a: T[]): T => a[Math.floor(rnd() * a.length)]
-const TYPES = ['map', 'flow', 'steps', 'cards', 'timeline', 'compare', 'bogus', '', null, 3]
+const TYPES = ['map', 'flow', 'steps', 'cards', 'timeline', 'compare', 'statemachine', 'network', 'bogus', '', null, 3]
 function val(d = 0): any {
   const r = rnd()
   if (d > 3) return pick([null, 'x', 1, true])
@@ -37,18 +38,27 @@ function val(d = 0): any {
   if (r < 0.42) return rnd() < 0.5
   if (r < 0.7) return Array.from({ length: Math.floor(rnd() * 25) }, () => val(d + 1))
   const o: any = {}
-  for (const k of ['id', 'label', 'title', 'text', 'col', 'row', 'from', 'to', 'cells', 'steps', 'nodes', 'edges', 'bullets', 'meter', 'parts', 'tone', 'status', 'icon', 'html', 'style', 'both', 'name', 'pick', 'date', 'done', 'more']) if (rnd() < 0.45) o[k] = val(d + 1)
+  for (const k of ['id', 'label', 'title', 'text', 'col', 'row', 'from', 'to', 'cells', 'steps', 'nodes', 'edges', 'bullets', 'meter', 'parts', 'tone', 'status', 'icon', 'html', 'style', 'both', 'name', 'pick', 'date', 'done', 'more', 'states', 'transitions', 'initial', 'terminal', 'group', 'size', 'weight', 'bidirectional']) if (rnd() < 0.45) o[k] = val(d + 1)
   return o
 }
 const mess = (good: any) => (rnd() < 0.8 ? good : val(2))
 const many = (n: number, f: (i: number) => any) => Array.from({ length: Math.floor(rnd() * n) }, (_, i) => (rnd() < 0.9 ? f(i) : val(2)))
 function nearValid() {
-  const type = pick(['map', 'flow', 'steps', 'cards', 'timeline', 'compare'])
+  const type = pick(['map', 'flow', 'steps', 'cards', 'timeline', 'compare', 'statemachine', 'network'])
   const o: any = { type, title: mess('T ' + 'x'.repeat(Math.floor(rnd() * 120))), subtitle: mess('s'), source: mess(pick(['technical.md', 'nope.md', '../x.md', 'projects/a/b.md'])), html: '<b>x</b>' }
   if (type === 'flow' || type === 'steps') o.steps = many(16, (i) => ({ title: mess('Step ' + i), text: mess('t'.repeat(Math.floor(rnd() * 400))), icon: mess(pick(['flag', 'evil'])), status: mess(pick(['done', 'x'])), bullets: many(8, () => 'b'), html: '<img onerror=1>' }))
   if (type === 'map') {
     o.nodes = many(20, (i) => ({ id: mess('n' + (i % 9)), label: mess('Node ' + i), col: mess(Math.floor(rnd() * 8) - 1), row: mess(Math.floor(rnd() * 6)), status: mess('now') }))
     o.edges = many(24, () => ({ from: mess('n' + Math.floor(rnd() * 9)), to: mess('n' + Math.floor(rnd() * 9)), style: mess('dashed'), both: mess(true) }))
+  }
+  if (type === 'statemachine') {
+    o.initial = mess('s' + Math.floor(rnd() * 9))
+    o.states = many(16, (i) => ({ id: mess('s' + (i % 9)), label: mess('State ' + i), sub: mess('x'.repeat(Math.floor(rnd() * 40))), icon: mess(pick(['flag', 'evil'])), terminal: mess(rnd() < 0.3) }))
+    o.transitions = many(22, () => ({ from: mess('s' + Math.floor(rnd() * 9)), to: mess('s' + Math.floor(rnd() * 9)), label: mess('go '.repeat(Math.floor(rnd() * 12))), style: mess(pick(['dashed', 'solid', 'wavy'])) }))
+  }
+  if (type === 'network') {
+    o.nodes = many(22, (i) => ({ id: mess('n' + (i % 18)), label: mess('Node ' + 'x'.repeat(i)), group: mess(pick(['A', 'B', 'C', 'g' + (i % 11), ''])), icon: mess(pick(['db', 'evil'])), size: mess(pick(['sm', 'md', 'lg', 'xl'])) }))
+    o.edges = many(30, () => ({ from: mess('n' + Math.floor(rnd() * 18)), to: mess('n' + Math.floor(rnd() * 18)), label: mess('l'), bidirectional: mess(rnd() < 0.3), both: mess(rnd() < 0.2), weight: mess(pick([0, 1, 2.5, 9, -3, Number.NaN])) }))
   }
   if (type === 'cards') o.cards = many(12, (i) => ({ title: mess('C' + i), text: mess('t'), more: many(6, () => 'm') }))
   if (type === 'timeline') o.items = many(16, (i) => ({ date: mess('d' + i), title: mess('I' + i), done: mess(true) }))
@@ -65,7 +75,7 @@ function shape() {
     return nearValid()
   }
   const o: any = { type: pick(TYPES) }
-  for (const k of ['title', 'subtitle', 'source', 'next', 'steps', 'nodes', 'edges', 'cards', 'items', 'columns', 'rows', 'meter_note', 'html']) if (rnd() < 0.6) o[k] = val(1)
+  for (const k of ['title', 'subtitle', 'source', 'next', 'steps', 'nodes', 'edges', 'cards', 'items', 'columns', 'rows', 'meter_note', 'html', 'states', 'transitions', 'initial']) if (rnd() < 0.6) o[k] = val(1)
   if (rnd() < 0.3) o.nodes = Array.from({ length: 20 }, (_, i) => ({ id: 'n' + (i % 7), label: 'L' + i, col: i % 3, row: i % 2 }))
   if (rnd() < 0.3) o.edges = [{ from: 'n1', to: 'n1' }, { from: 'n1', to: 'n2' }, { from: 'n2', to: 'n1' }, { from: 'n1', to: 'zz' }]
   return o
@@ -103,7 +113,7 @@ function check(out: any): string[] {
       enumOk(s.status, STATUS, 'step.status')
     }
   }
-  if (out.nodes) {
+  if (out.type === 'map') {
     if (!out.nodes.length || out.nodes.length > L.nodes) fails.push('nodes count ' + out.nodes.length)
     const cells = new Set<string>()
     const ids = new Set<string>()
@@ -131,6 +141,56 @@ function check(out: any): string[] {
       if (typeof e.both !== 'boolean') fails.push('edge both')
     }
   }
+  if (out.type === 'statemachine') {
+    if (!out.states.length || out.states.length > L.states) fails.push('states count ' + out.states.length)
+    const ids = new Set<string>()
+    for (const st of out.states) {
+      if (ids.has(st.id) || !/^[a-z0-9_-]{1,24}$/i.test(st.id)) fails.push('bad or duplicate state id ' + st.id)
+      ids.add(st.id)
+      cap(st.label, L.label, 'state.label')
+      if (!st.label) fails.push('empty state label')
+      cap(st.sub, L.sub, 'state.sub')
+      enumOk(st.icon, ICONS, 'state.icon')
+      if (typeof st.terminal !== 'boolean') fails.push('terminal not boolean')
+    }
+    if (!ids.has(out.initial)) fails.push('initial is not a state: ' + out.initial)
+    if (out.transitions.length > L.transitions) fails.push('transitions>16')
+    const seen = new Set<string>()
+    for (const t of out.transitions) {
+      if (!ids.has(t.from) || !ids.has(t.to)) fails.push('transition to a missing state')
+      if (seen.has(t.from + '>' + t.to)) fails.push('duplicate transition')
+      seen.add(t.from + '>' + t.to)
+      cap(t.label, L.edgeLabel, 'transition.label')
+      if (t.style !== 'solid' && t.style !== 'dashed') fails.push('transition style ' + t.style)
+    }
+  }
+  if (out.type === 'network') {
+    if (!out.nodes.length || out.nodes.length > L.netNodes) fails.push('network nodes count ' + out.nodes.length)
+    const ids = new Set<string>()
+    const groups = new Set<string>()
+    for (const n of out.nodes) {
+      if (ids.has(n.id) || !/^[a-z0-9_-]{1,24}$/i.test(n.id)) fails.push('bad or duplicate node id ' + n.id)
+      ids.add(n.id)
+      cap(n.label, L.label, 'node.label')
+      cap(n.group, L.group, 'node.group')
+      if (n.group) groups.add(n.group)
+      enumOk(n.icon, ICONS, 'node.icon')
+      if (!['sm', 'md', 'lg'].includes(n.size)) fails.push('node size ' + n.size)
+    }
+    if (groups.size > L.groups) fails.push('groups>8')
+    if (out.edges.length > L.netEdges) fails.push('network edges>24')
+    const pairs = new Set<string>()
+    for (const e of out.edges) {
+      if (e.from === e.to) fails.push('network self edge')
+      if (!ids.has(e.from) || !ids.has(e.to)) fails.push('network edge to a missing node')
+      const k = [e.from, e.to].sort().join('>')
+      if (pairs.has(k)) fails.push('network dup edge')
+      pairs.add(k)
+      cap(e.label, L.edgeLabel, 'edge.label')
+      if (typeof e.both !== 'boolean') fails.push('edge both')
+      if (!finite(e.weight) || e.weight < 1 || e.weight > 5) fails.push('weight ' + e.weight)
+    }
+  }
   if (out.cards && (!out.cards.length || out.cards.length > L.cards)) fails.push('cards count ' + out.cards.length)
   if (out.items && (!out.items.length || out.items.length > L.items)) fails.push('items count ' + out.items.length)
   if (out.rows) {
@@ -150,15 +210,39 @@ function check(out: any): string[] {
   return fails
 }
 
+/** A graph layout (statemachine · network): a finite size, one box per node and one path per edge, every box and path
+ *  point inside the drawing, no two boxes overlapping, paths made of M/L/Q/C only, bands of elliptic arcs. */
+function graphCheck(lay: any, nodes: number, edges: number): string[] {
+  const fails: string[] = []
+  if (!finite(lay.width) || !finite(lay.height) || lay.width <= 0 || lay.height <= 0) fails.push('graph size')
+  if (lay.nodes.length !== nodes) fails.push('graph dropped a node')
+  if (lay.edges.length !== edges) fails.push('graph dropped an edge')
+  for (const n of lay.nodes) {
+    if (![n.x, n.y, n.w, n.h].every(finite) || n.x < 0 || n.y < 0 || n.x + n.w > lay.width + 0.5 || n.y + n.h > lay.height + 0.5) fails.push('box outside the drawing ' + n.id)
+  }
+  for (let i = 0; i < lay.nodes.length; i++)
+    for (let j = i + 1; j < lay.nodes.length; j++) {
+      const a = lay.nodes[i], b = lay.nodes[j]
+      if (a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h) fails.push('boxes overlap: ' + a.id + ' ' + b.id)
+    }
+  for (const e of lay.edges) {
+    if (!/^M[\d. LQC-]+$/.test(e.d) || !finite(e.lx) || !finite(e.ly)) fails.push('graph edge path ' + e.d)
+    for (const v of e.d.match(/-?[\d.]+/g) || []) if (+v < -0.5 || +v > Math.max(lay.width, lay.height) + 0.5) fails.push('edge point outside the drawing ' + v)
+  }
+  for (const b of lay.bands) if (!/^M[\d. AL-]+$/.test(b.d)) fails.push('band path ' + b.d)
+  return fails
+}
+
 /** Every spec the B1 fuzz drew; the render test below draws each one with the real React renderers. */
 const DRAWN: { spec: any; raw?: string }[] = []
 
-test('(B1) 1,000 fuzzed shapes: parse never throws, all caps hold, map geometry + code fallback never throw', () => {
+test('(B1) 1,400 fuzzed shapes: parse never throws, all caps hold, map geometry + code fallback never throw', () => {
   const fails: string[] = []
   let drawn = 0
   const byType: Record<string, number> = {}
   let mapEdges = 0
-  for (let i = 0; i < 1000; i++) {
+  let graphs = 0
+  for (let i = 0; i < 1400; i++) {
     const sh = shape()
     const raw = rnd() < 0.5 ? JSON.stringify(sh) : sh
     let out: any
@@ -178,6 +262,16 @@ test('(B1) 1,000 fuzzed shapes: parse never throws, all caps hold, map geometry 
     DRAWN.push({ spec: out, raw: typeof raw === 'string' ? raw : undefined })
     byType[out.type] = (byType[out.type] || 0) + 1
     fails.push(...check(out))
+    if (out.type === 'statemachine' || out.type === 'network') {
+      try {
+        const net = out.type === 'network'
+        const lay = net ? G.netLayout(out) : G.smLayout(out)
+        graphs++
+        fails.push(...graphCheck(lay, net ? out.nodes.length : out.states.length, net ? out.edges.length : out.transitions.length))
+      } catch (e: any) {
+        fails.push(out.type + ' layout threw: ' + e.message)
+      }
+    }
     if (out.type === 'map') {
       mapEdges += out.edges.length
       try {
@@ -190,11 +284,12 @@ test('(B1) 1,000 fuzzed shapes: parse never throws, all caps hold, map geometry 
       }
     }
   }
-  assert.ok(near >= 300, `near-valid shapes: ${near} of 1,000 (need ≥30%)`)
+  assert.ok(near >= 300, `near-valid shapes: ${near} of 1,400 (need ≥30%)`)
   assert.ok(drawn >= 300, `drawn: ${drawn} (the parser must still accept most near-valid shapes)`)
   for (const t of X.EX_TYPES) assert.ok((byType[t] || 0) >= 20, `every type is exercised: ${JSON.stringify(byType)}`)
   // today: 577 near-valid, 514 drawn (map 97 · flow 155 · timeline 116 · cards 79 · compare 67), 97 map edges
   assert.ok(mapEdges >= 50, `map edges exercised: ${mapEdges}`)
+  assert.ok(graphs >= 40, `statemachine + network layouts exercised: ${graphs}`)
   assert.deepEqual(fails.slice(0, 5), [], `${fails.length} failures`)
 })
 
@@ -366,4 +461,70 @@ test('(B1) render never throws: every fuzzed spec through <Explainer> (React, se
   }
   assert.ok(compares >= 20, 'compare + decision exercised: ' + compares)
   assert.deepEqual(fails.slice(0, 5), [], `${fails.length} render failures of ${DRAWN.length}`)
+})
+
+test('statemachine: ids, labels and moves cleaned; self-loops kept; a repeated move dropped (its way back kept); initial falls back', () => {
+  const out = parse({
+    type: 'statemachine',
+    title: 'Orders',
+    initial: 'ghost',
+    states: [
+      { id: 'new', label: 'New', icon: 'file', sub: 'cart saved' },
+      { id: 'paid', label: 'Paid', terminal: 'yes' },
+      { id: 'new', label: 'New again' }, // duplicate id
+      { id: 'bad id', label: 'X' },
+      { id: 'blank', label: '   ' },
+      { id: 'constructor', label: 'Proto', terminal: true },
+    ],
+    transitions: [
+      { from: 'new', to: 'paid', label: 'pay', style: 'wavy' },
+      { from: 'new', to: 'paid', label: 'pay twice' }, // same direction again
+      { from: 'paid', to: 'new', label: 'refund', style: 'dashed' }, // the way back is its own move
+      { from: 'paid', to: 'paid', label: 'retry' }, // self-loop
+      { from: 'new', to: 'zz' }, { from: 'toString', to: 'new' }, { from: 'constructor', to: 'new' },
+    ],
+  })
+  assert.equal(out.initial, 'new', 'unknown initial → the first state')
+  assert.deepEqual(out.states.map((s: any) => [s.id, s.terminal]), [['new', false], ['paid', false], ['constructor', true]])
+  assert.deepEqual(out.transitions.map((t: any) => `${t.from}>${t.to}:${t.style}`), ['new>paid:solid', 'paid>new:dashed', 'paid>paid:solid', 'constructor>new:solid'])
+  assert.equal(parse({ type: 'statemachine', states: [{ id: 'a' }] }), null, 'no labelled state → null')
+  const lay = G.smLayout(out)
+  assert.ok(lay.start, 'a start marker')
+  assert.equal(lay.nodes.find((n: any) => n.id === 'new').start, true)
+  assert.deepEqual(lay.lines, ['New → Paid: pay', 'Paid → New: refund', 'Paid → itself: retry', 'Proto → New'])
+  assert.deepEqual(G.smLayout({ title: 'x', initial: 'a', states: [], transitions: [{ from: 'a', to: 'b' }] }).edges, [], 'layout is total too')
+})
+
+test('statemachine layout: up to 4 layers run left → right, a longer chain runs top → bottom', () => {
+  const chain = (n: number) => parse({
+    type: 'statemachine',
+    states: Array.from({ length: n }, (_, i) => ({ id: 's' + i, label: 'Step ' + i })),
+    transitions: Array.from({ length: n - 1 }, (_, i) => ({ from: 's' + i, to: 's' + (i + 1) })),
+  })
+  const short = G.smLayout(chain(4)), long = G.smLayout(chain(7))
+  assert.ok(short.width > short.height, `4 layers lie down: ${short.width}×${short.height}`)
+  assert.ok(long.height > long.width, `7 layers stand up: ${long.width}×${long.height}`)
+})
+
+test('network: self and repeated links dropped (either direction), bidirectional = both, weight clamped 1–5, a 9th group drawn ungrouped', () => {
+  const out = parse({
+    type: 'network',
+    nodes: [
+      ...Array.from({ length: 9 }, (_, i) => ({ id: 'g' + i, label: 'G' + i, group: 'Group ' + i, size: i === 0 ? 'lg' : 'huge' })),
+      { id: 'x', label: 'X' }, { id: 'x', label: 'dup' }, { id: 'y', label: '' },
+    ],
+    edges: [
+      { from: 'g0', to: 'g0' }, { from: 'g0', to: 'g1', bidirectional: true, weight: 9 }, { from: 'g1', to: 'g0', label: 'again' },
+      { from: 'g1', to: 'x', both: true, weight: -2 }, { from: 'x', to: 'g2', weight: Number.NaN }, { from: 'x', to: 'nope' },
+    ],
+  })
+  assert.equal(out.nodes.length, 10)
+  assert.deepEqual(out.nodes.map((n: any) => n.size).slice(0, 2), ['lg', 'md'])
+  assert.equal(out.nodes.find((n: any) => n.id === 'g8').group, '', 'the 9th group → ungrouped')
+  assert.deepEqual(out.edges.map((e: any) => [`${e.from}>${e.to}`, e.both, e.weight]), [['g0>g1', true, 5], ['g1>x', true, 1], ['x>g2', false, 1]])
+  const lay = G.netLayout(out)
+  assert.equal(lay.groups.length, 8)
+  assert.equal(lay.bands.length, 8, 'one band per group')
+  assert.equal(lay.labels, true, '≤ 8 links: every label drawn')
+  assert.deepEqual(lay.lines, ['G0 ↔ G1', 'G1 ↔ X', 'X → G2'])
 })

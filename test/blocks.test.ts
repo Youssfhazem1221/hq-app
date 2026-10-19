@@ -331,14 +331,37 @@ test('StatusBoard: icon · name · line · state chip (icon + word); compact dro
 
 // ---- (B5) contrast of the quiet marks ----
 
-test('(B5) later beads/nodes and context points (--mark-empty/--mark-ctx) are ≥3:1 on --raise and --pane, light and dark', () => {
+test('(B5) later beads/nodes and context points (--mark-empty/--mark-ctx) are ≥3:1 on --raise and --pane, light and dark, under every accent tint', () => {
   const css = fs.readFileSync(path.join(APP, 'src', 'styles', 'tokens.css'), 'utf8')
   const block = (sel: RegExp) => (css.match(sel) || [])[1] || ''
   const light = block(/:root\{([\s\S]*?)\n\}/)
   const dark = block(/:root\[data-theme="dark"\]\{([\s\S]*?)\n\}/)
-  const get = (b: string, name: string) => (b.match(new RegExp('--' + name + ':(#[0-9a-f]{6})', 'i')) || [])[1]
+  // a surface is a hex, or color-mix(in oklab,#hex P%,var(--tint)) = that grey leaning toward the accent's hue
+  const tints = [(light.match(/--accent:(#[0-9a-f]{6})/i) || [])[1], ...[...css.matchAll(/:root\[data-accent="\w+"\]\{--accent:(#[0-9a-f]{6})/gi)].map((m) => m[1])]
+  assert.equal(tints.filter(Boolean).length, 6, 'six accent fills found')
+  const rgb = (hex: string) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255)
+  const lin = (v: number) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4)
+  const toLab = (hex: string) => {
+    const [r, g, b] = rgb(hex).map(lin)
+    const [l, m, q] = [0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b, 0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b, 0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b].map(Math.cbrt)
+    return [0.2104542553 * l + 0.793617785 * m - 0.0040720468 * q, 1.9779984951 * l - 2.428592205 * m + 0.4505937099 * q, 0.0259040371 * l + 0.7827717662 * m - 0.808675766 * q]
+  }
+  const fromLab = ([L, A, B]: number[]) => {
+    const [l, m, q] = [L + 0.3963377774 * A + 0.2158037573 * B, L - 0.1055613458 * A - 0.0638541728 * B, L - 0.0894841775 * A - 1.291485548 * B].map((v) => v ** 3)
+    const out = [4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * q, -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * q, -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * q]
+    return '#' + out.map((v) => Math.round(Math.min(1, Math.max(0, v <= 0.0031308 ? 12.92 * v : 1.055 * v ** (1 / 2.4) - 0.055)) * 255).toString(16).padStart(2, '0')).join('')
+  }
+  const values = (b: string, name: string): string[] => {
+    const v = ((b.match(new RegExp('--' + name + ':([^;]+);')) || [])[1] || '').trim()
+    if (/^#[0-9a-f]{6}$/i.test(v)) return [v]
+    const m = v.match(/^color-mix\(in oklab,(#[0-9a-f]{6}) (\d+)%,var\(--tint\)\)$/i)
+    if (!m) return []
+    const [a, keep] = [toLab(m[1]), +m[2] / 100]
+    return tints.map((t) => fromLab(a.map((x, i) => x * keep + toLab(t)[i] * (1 - keep))))
+  }
+  const get = (b: string, name: string) => values(b, name)[0]
   const lum = (hex: string) => {
-    const c = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255).map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4))
+    const c = rgb(hex).map(lin)
     return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
   }
   const ratio = (a: string, b: string) => {
@@ -350,9 +373,9 @@ test('(B5) later beads/nodes and context points (--mark-empty/--mark-ctx) are �
     for (const mark of ['mark-empty', 'mark-ctx']) {
       for (const bg of ['raise', 'pane']) {
         const m = get(b, mark)
-        const g = get(b, bg)
-        assert.ok(m && g, `${theme} --${mark} / --${bg} found`)
-        const r = ratio(m, g)
+        const gs = values(b, bg)
+        assert.ok(m && gs.length, `${theme} --${mark} / --${bg} found`)
+        const r = Math.min(...gs.map((g) => ratio(m, g)))
         rows.push(`${theme} ${mark} on ${bg}: ${r.toFixed(2)}`)
         assert.ok(r >= 3, `${theme} --${mark} on --${bg} = ${r.toFixed(2)}:1`)
       }

@@ -383,9 +383,9 @@ test('(C1-1 real) open decision → queue[0] = that decision, queue[1] = the old
   const nextThere = N.nextQueue(m2, me).find((x: any) => x.project === slug)
   assert.ok(nextThere, 'another to-do in that project')
   assert.deepEqual(N.nextFor(m2, me, slug), nextThere)
-  // the app's own project has no to-dos → its `next:` as a milestone item
+  // the app's own project, while it has no open to-dos → its `next:` as a milestone item
   const appProj = m2.projects.find((p: any) => p.data.title === 'HQ dashboard')
-  if (appProj) {
+  if (appProj && !m2.todos.some((x: any) => N.isOpenTodo(x) && N.projectOfTodo(x, m2) === N.projectSlugOf(appProj))) {
     const s = N.projectSlugOf(appProj)
     const it = N.nextFor(m2, me, s)
     assert.equal(it.kind, 'milestone')

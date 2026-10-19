@@ -8,7 +8,7 @@
 // lib/auto-visuals.ts use it directly.
 import { EXPLAINER_ICONS, MAX_RICH_BLOCKS, type BlockCtx, type ExplainerIcon } from '../../lib/contracts'
 
-export const EX_TYPES = ['map', 'flow', 'cards', 'timeline', 'compare'] as const
+export const EX_TYPES = ['map', 'flow', 'cards', 'timeline', 'compare', 'statemachine', 'network'] as const
 export type ExType = (typeof EX_TYPES)[number]
 /** The 30 icon names a block may use (the contract's list; mapped to lucide in lib/icons.tsx). Anything else → no icon. */
 export const EX_ICONS = EXPLAINER_ICONS
@@ -17,6 +17,9 @@ export const EX_STATUS = ['done', 'now', 'next', 'later', 'blocked', 'wait'] as 
 export type ExStatus = (typeof EX_STATUS)[number]
 export const EX_TONES = ['ok', 'warn', 'idea'] as const
 export type ExTone = (typeof EX_TONES)[number]
+/** Network node sizes. */
+export const EX_SIZES = ['sm', 'md', 'lg'] as const
+export type ExSize = (typeof EX_SIZES)[number]
 
 /** Byte cap checked before JSON.parse (UTF-8). */
 export const EX_MAX_BYTES = 12288
@@ -30,6 +33,7 @@ export const EX_LIMITS = {
   cards: 8, cardTitle: 40, cardText: 160,
   items: 12, date: 16, itemTitle: 80,
   columns: 5, column: 24, rows: 8, rowName: 60, cell: 60, parts: 3, part: 40, meterNote: 60,
+  states: 12, transitions: 16, netNodes: 16, netEdges: 24, group: 24, groups: 8,
   fallback: 2000,
 } as const
 const L = EX_LIMITS
@@ -45,6 +49,12 @@ export type TimelineItem = { date: string; title: string; done: boolean }
 export type EvidencePart = { text: string; tone: ExTone | null }
 export type CompareCell = { text: string; tone: ExTone | null; meter: number | null; parts: EvidencePart[] | null }
 export type CompareRow = { name: string; pick: boolean; cells: CompareCell[] }
+export type SmState = { id: string; label: string; sub: string; icon: ExIcon | null; terminal: boolean }
+/** A move between states; from === to is a self-loop (e.g. "retry"). */
+export type SmTransition = { from: string; to: string; label: string; style: 'solid' | 'dashed' }
+export type NetNode = { id: string; label: string; group: string; icon: ExIcon | null; size: ExSize }
+/** `both` = arrows at both ends (the spec key is `bidirectional`; `both` is accepted too, as on a map). weight 1–5. */
+export type NetEdge = { from: string; to: string; label: string; both: boolean; weight: number }
 
 /** Shared head. `source` is '' unless it is a safe .md path that exists; `title` falls back to "Explainer". */
 type Head = { title: string; subtitle: string; source: string; next: string }
@@ -53,7 +63,10 @@ export type MapSpec = Head & { type: 'map'; nodes: MapNode[]; edges: MapEdge[] }
 export type CardsSpec = Head & { type: 'cards'; cards: ExCard[] }
 export type TimelineSpec = Head & { type: 'timeline'; items: TimelineItem[] }
 export type CompareSpec = Head & { type: 'compare'; columns: string[]; meter_note: string; rows: CompareRow[] }
-export type ExplainerSpec = FlowSpec | MapSpec | CardsSpec | TimelineSpec | CompareSpec
+/** `initial` is always a state id (the first state when the block names none or an unknown one). */
+export type StateMachineSpec = Head & { type: 'statemachine'; initial: string; states: SmState[]; transitions: SmTransition[] }
+export type NetworkSpec = Head & { type: 'network'; nodes: NetNode[]; edges: NetEdge[] }
+export type ExplainerSpec = FlowSpec | MapSpec | CardsSpec | TimelineSpec | CompareSpec | StateMachineSpec | NetworkSpec
 
 export type ParseOptions = {
   /** Does this repo path exist (e.g. `p => model.byPath.has(p)`)? Without it, every `source` is dropped. */
@@ -194,6 +207,68 @@ export function parseExplainer(src: unknown, opts?: ParseOptions | null): Explai
         if (pairs.has(key)) continue
         pairs.add(key)
         edges.push({ from, to, label: txt(e.label, L.edgeLabel), style: e.style === 'dashed' ? 'dashed' : 'solid', both: e.both === true })
+      }
+      return { type, ...head, nodes, edges }
+    }
+
+    if (type === 'statemachine') {
+      const ids = new Set<string>()
+      const states: SmState[] = []
+      for (const n of list(s.states, L.states)) {
+        if (!isObj(n)) continue
+        const id = n.id
+        const label = txt(n.label, L.label)
+        if (typeof id !== 'string' || !NODE_ID.test(id) || ids.has(id) || !label) continue
+        ids.add(id)
+        states.push({ id, label, sub: txt(n.sub, L.sub), icon: oneOf(EX_ICONS, n.icon), terminal: n.terminal === true })
+      }
+      if (!states.length) return null
+      const seen = new Set<string>()
+      const transitions: SmTransition[] = []
+      for (const e of list(s.transitions, L.transitions)) {
+        if (!isObj(e)) continue
+        const { from, to } = e
+        if (typeof from !== 'string' || typeof to !== 'string' || !ids.has(from) || !ids.has(to) || seen.has(from + '>' + to)) continue
+        seen.add(from + '>' + to)
+        transitions.push({ from, to, label: txt(e.label, L.edgeLabel), style: e.style === 'dashed' ? 'dashed' : 'solid' })
+      }
+      const initial = typeof s.initial === 'string' && ids.has(s.initial) ? s.initial : states[0].id
+      return { type, ...head, initial, states, transitions }
+    }
+
+    if (type === 'network') {
+      const ids = new Set<string>()
+      const groups = new Set<string>()
+      const nodes: NetNode[] = []
+      for (const n of list(s.nodes, L.netNodes)) {
+        if (!isObj(n)) continue
+        const id = n.id
+        const label = txt(n.label, L.label)
+        if (typeof id !== 'string' || !NODE_ID.test(id) || ids.has(id) || !label) continue
+        ids.add(id)
+        // groups are colour slots: the 9th distinct group and later are drawn ungrouped
+        let group = txt(n.group, L.group)
+        if (group && !groups.has(group)) {
+          if (groups.size < L.groups) groups.add(group)
+          else group = ''
+        }
+        nodes.push({ id, label, group, icon: oneOf(EX_ICONS, n.icon), size: oneOf(EX_SIZES, n.size) || 'md' })
+      }
+      if (!nodes.length) return null
+      const pairs = new Set<string>()
+      const edges: NetEdge[] = []
+      for (const e of list(s.edges, L.netEdges)) {
+        if (!isObj(e)) continue
+        const { from, to } = e
+        if (typeof from !== 'string' || typeof to !== 'string' || from === to || !ids.has(from) || !ids.has(to)) continue
+        const key = from < to ? from + '>' + to : to + '>' + from
+        if (pairs.has(key)) continue
+        pairs.add(key)
+        const w = e.weight
+        edges.push({
+          from, to, label: txt(e.label, L.edgeLabel), both: e.bidirectional === true || e.both === true,
+          weight: typeof w === 'number' && Number.isFinite(w) ? Math.max(1, Math.min(5, w)) : 1,
+        })
       }
       return { type, ...head, nodes, edges }
     }

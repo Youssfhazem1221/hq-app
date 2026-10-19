@@ -16,13 +16,13 @@
 .meter i{display:block;height:100%;border-radius:999px;background:var(--vc,var(--accent));transition:width var(--dur-4) var(--ease)}
 .has-pc{--vc:var(--pc)}
 .meter.mini{display:inline-block;width:34px;height:6px;vertical-align:middle}
-.tl{list-style:none;position:relative;display:grid;gap:2px;padding:0;--vc:var(--accent)}
-.journey .tl{--vc:var(--pc)}
+.tl{list-style:none;position:relative;display:grid;gap:2px;padding:0;--vc:var(--accent);--on-vc:var(--on-accent)}
+.journey .tl{--vc:var(--pc);--on-vc:#fff}
 .tl::before{content:"";position:absolute;left:11px;top:8px;bottom:8px;width:2px;background:var(--line)}
 .tl li{display:grid;grid-template-columns:24px minmax(0,1fr) auto;gap:10px;align-items:start;padding:6px 0;position:relative}
 .tl .nd{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;background:var(--raise);border:2px solid var(--mark-empty);z-index:1}
 .tl .nd svg{width:12px;height:12px;stroke-width:3}
-.tl li.done .nd{background:var(--vc);border-color:var(--vc);color:#fff}
+.tl li.done .nd{background:var(--vc);border-color:var(--vc);color:var(--on-vc)}
 .tl li.next .nd{border-color:var(--vc);box-shadow:0 0 0 4px color-mix(in srgb,var(--vc) 18%,transparent)}
 .tl li.next .tx{font-weight:650}
 .tl .tx{font-size:var(--t-sm);padding-top:2px;min-width:0;overflow-wrap:anywhere}
@@ -154,6 +154,16 @@
 .map-tw{margin-top:10px}
 .mapv.as-list .map-fig,.mapv.as-list .map-tw{display:none}
 .mapv.as-list .mlist{display:grid}
+/* statemachine + network (graph.ts): the map styles plus the start marker, end-state ring, icons and group bands */
+.map-svg .node rect.ring{fill:none}
+.graph .map-fig{margin-inline:auto}
+.map-svg .ic{color:var(--muted)}
+.map-svg .m-st circle,.lg-line circle{fill:var(--fg-2)}
+.map-svg .m-st path{stroke:var(--fg-2);stroke-width:1.6;fill:none}
+.map-svg .band{fill:none;stroke:var(--pc);stroke-opacity:.16;stroke-linecap:round}
+.legend i.gk{background:var(--pc);border-radius:50%}
+.legend i.lg-end{width:16px;height:11px;border:3px double var(--fg-2);border-radius:6px}
+.chip.gchip{background:color-mix(in srgb,var(--pc) 18%,transparent);color:var(--fg)}
 /* cards */
 .xcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px}
 .xcard{border:1px solid var(--line);background:var(--raise);border-radius:var(--r-sm);padding:12px;text-align:left;display:grid;gap:4px;align-content:start;min-width:0;color:var(--fg)}
@@ -248,6 +258,7 @@ button.jchip:hover{border-color:var(--pc)}
 .spt.est circle{stroke:var(--fg-2);stroke-width:1.5;stroke-dasharray:3 2}
 .spt.picked circle{stroke:var(--fg);stroke-width:2.5;stroke-dasharray:none}
 .spt text{fill:#fff;font:700 11px var(--font-ui);pointer-events:none}
+.spt.pick text{fill:var(--on-accent)}
 .splab{fill:var(--fg-2);font:550 12px var(--font-ui);pointer-events:none}
 .splab.pick{fill:var(--fg);font-weight:700}
 .axl{fill:var(--muted);font:600 11px var(--font-ui)}

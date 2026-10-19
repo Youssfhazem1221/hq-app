@@ -23,6 +23,58 @@ export const v3 = true
 const ok = (p: string) => p.endsWith('.md')
 const ex = (o: object) => parseExplainer(o, { exists: ok }) as ExplainerSpec
 
+const SM = ex({
+  type: 'statemachine', title: 'Order lifecycle', subtitle: 'Where an order can go next. Tap a state.', source: 'projects/demo/project.md', initial: 'new',
+  states: [
+    { id: 'new', label: 'New', sub: 'cart saved', icon: 'file' },
+    { id: 'paid', label: 'Paid', icon: 'coins' },
+    { id: 'failed', label: 'Payment failed' },
+    { id: 'shipped', label: 'Shipped', sub: 'with the courier' },
+    { id: 'done', label: 'Delivered', terminal: true, icon: 'check' },
+    { id: 'refunded', label: 'Refunded', terminal: true },
+  ],
+  transitions: [
+    { from: 'new', to: 'paid', label: 'payment ok' },
+    { from: 'new', to: 'failed', label: 'card declined' },
+    { from: 'failed', to: 'new', label: 'try again' },
+    { from: 'failed', to: 'failed', label: 'retry', style: 'dashed' },
+    { from: 'paid', to: 'shipped', label: 'warehouse' },
+    { from: 'shipped', to: 'done', label: 'courier confirms' },
+    { from: 'paid', to: 'refunded', label: 'cancelled', style: 'dashed' },
+    { from: 'new', to: 'shipped', label: 'free sample', style: 'dashed' },
+  ],
+})
+const SM_LONG = ex({
+  type: 'statemachine', title: 'Short video pipeline', initial: 'idea',
+  states: ['idea', 'script', 'voice', 'animate', 'edit', 'review', 'posted'].map((id, i) => ({ id, label: id[0].toUpperCase() + id.slice(1), terminal: i === 6 })),
+  transitions: [
+    { from: 'idea', to: 'script' }, { from: 'script', to: 'voice', label: 'hook <= 12 words' }, { from: 'voice', to: 'animate' },
+    { from: 'animate', to: 'edit' }, { from: 'edit', to: 'review' }, { from: 'review', to: 'posted', label: 'approved' },
+    { from: 'review', to: 'script', label: 'rewrite' },
+  ],
+})
+const NET = ex({
+  type: 'network', title: 'HQ services', subtitle: 'What talks to what. Tap a node.', source: 'projects/demo/project.md',
+  nodes: [
+    { id: 'app', label: 'hq-app', group: 'Frontend', icon: 'layout', size: 'lg' },
+    { id: 'pages', label: 'GitHub Pages', group: 'Frontend', icon: 'globe' },
+    { id: 'ask', label: 'ask function', group: 'Supabase', icon: 'zap' },
+    { id: 'notify', label: 'notify function', group: 'Supabase', icon: 'bell' },
+    { id: 'db', label: 'pgvector index', group: 'Supabase', icon: 'db', size: 'lg' },
+    { id: 'repo', label: 'hq repo', group: 'GitHub', icon: 'repo', size: 'lg' },
+    { id: 'actions', label: 'Actions', group: 'GitHub', icon: 'zap', size: 'sm' },
+    { id: 'bridge', label: 'Claude bridge', icon: 'bot' },
+    { id: 'gemini', label: 'Gemini', icon: 'spark', size: 'sm' },
+  ],
+  edges: [
+    { from: 'pages', to: 'app', label: 'serves' }, { from: 'app', to: 'ask', label: 'Ask AI', weight: 3 },
+    { from: 'app', to: 'repo', label: 'read · write', bidirectional: true, weight: 4 }, { from: 'ask', to: 'db', label: 'search', weight: 2 },
+    { from: 'ask', to: 'gemini', label: 'prompt' }, { from: 'repo', to: 'actions', label: 'on push' },
+    { from: 'actions', to: 'db', label: 'index' }, { from: 'repo', to: 'notify', label: 'webhook' },
+    { from: 'notify', to: 'bridge', label: 'wake' }, { from: 'bridge', to: 'repo', label: 'pull · push', both: true },
+  ],
+})
+
 const MAP = ex({
   type: 'map', title: 'How the demo app works', subtitle: 'Everything goes through the API. Tap a box.', source: 'projects/demo/project.md',
   nodes: [
@@ -195,6 +247,9 @@ export default function VisualsPreview() {
           <Journey project={EMPTY} next={{ kind: 'checkin', id: 'pv:ci', text: 'Log one thing you did today' }} onAct={() => toast('Check in', 'info')} />
         </div>
 
+        <div className="c12" id="pv-sm"><Explainer spec={SM} /></div>
+        <div className="c12" id="pv-sm-long"><Explainer spec={SM_LONG} /></div>
+        <div className="c12" id="pv-net"><Explainer spec={NET} /></div>
         <div className="c12" id="pv-map"><Explainer spec={MAP} /></div>
         <div className="c12" id="pv-flow"><Explainer spec={FLOW} /></div>
         <div className="c12" id="pv-compare"><Explainer spec={CMP} ctx={{ decide: DECIDE }} /></div>

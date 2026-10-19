@@ -5,7 +5,7 @@
 /* ---- project colour slots (data attribute, enum 1-8) ---- */
 [data-pc="1"]{--pc:var(--viz-1)} [data-pc="2"]{--pc:var(--viz-2)} [data-pc="3"]{--pc:var(--viz-3)} [data-pc="4"]{--pc:var(--viz-4)}
 [data-pc="5"]{--pc:var(--viz-5)} [data-pc="6"]{--pc:var(--viz-6)} [data-pc="7"]{--pc:var(--viz-7)} [data-pc="8"]{--pc:var(--viz-8)}
-.pglyph{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;background:var(--pc,var(--viz-1));color:#fff;flex:none}
+.pglyph{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;background:linear-gradient(180deg,rgba(255,255,255,.16),transparent) var(--pc,var(--viz-1));color:#fff;flex:none;box-shadow:inset 0 1px 0 rgba(255,255,255,.18),0 1px 2px rgba(0,0,0,.18)}
 .pglyph svg{width:16px;height:16px}
 .pglyph.lg{width:44px;height:44px;border-radius:12px}
 .pglyph.lg svg{width:22px;height:22px}
@@ -55,7 +55,7 @@ section+section>.grp,.gallery+section>.grp{margin-top:18px}
 .ptiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:var(--s3)}
 @media (max-width:1100px){.ptiles{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (max-width:560px){.ptiles{grid-template-columns:minmax(0,1fr)}}
-.ptile{display:grid;gap:10px;align-content:start;padding:12px;border:1px solid var(--line);border-radius:var(--r);background:var(--raise);text-decoration:none;color:inherit;min-width:0;transition:border-color var(--dur-2),box-shadow var(--dur-2),transform var(--dur-2)}
+.ptile{display:grid;gap:10px;align-content:start;padding:12px;border:1px solid var(--line);border-radius:var(--r);background:var(--raise);box-shadow:var(--e1);text-decoration:none;color:inherit;min-width:0;transition:border-color var(--dur-2),box-shadow var(--dur-2),transform var(--dur-2)}
 .ptile:hover{border-color:color-mix(in srgb,var(--pc) 60%,var(--line));box-shadow:var(--e2);text-decoration:none;transform:translateY(-1px)}
 .ptile-h{display:flex;align-items:center;gap:9px;min-width:0}
 .ptile-h b{flex:1;min-width:0;font-size:var(--t-md);font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -75,8 +75,8 @@ section+section>.grp,.gallery+section>.grp{margin-top:18px}
 .gallery{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--s4)}
 @media (max-width:1100px){.gallery{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (max-width:620px){.gallery{grid-template-columns:minmax(0,1fr)}}
-.gcard{display:grid;grid-template-rows:auto auto auto 1fr auto;gap:12px;padding:14px;border:1px solid var(--line);border-radius:var(--r);background:var(--raise);color:inherit;text-decoration:none;min-width:0;position:relative;overflow:hidden;transition:border-color var(--dur-2),box-shadow var(--dur-2),transform var(--dur-2)}
-.gcard::before{content:"";position:absolute;inset:0 0 auto 0;height:64px;background:linear-gradient(180deg,color-mix(in srgb,var(--pc) 14%,transparent),transparent);pointer-events:none}
+.gcard{display:grid;grid-template-rows:auto auto auto 1fr auto;gap:12px;padding:14px;border:1px solid var(--line);border-radius:var(--r);background:var(--raise);box-shadow:var(--e1);color:inherit;text-decoration:none;min-width:0;position:relative;overflow:hidden;transition:border-color var(--dur-2),box-shadow var(--dur-2),transform var(--dur-2)}
+.gcard::before{content:"";position:absolute;inset:0 0 auto 0;height:72px;background:linear-gradient(180deg,color-mix(in srgb,var(--pc) 16%,transparent),transparent);pointer-events:none}
 .gcard:hover{box-shadow:var(--e2);text-decoration:none;transform:translateY(-1px);border-color:color-mix(in srgb,var(--pc) 55%,var(--line))}
 .gcard>*{position:relative;min-width:0}
 .gcard .top-row{display:flex;align-items:center;gap:10px}
@@ -185,7 +185,7 @@ section+section>.grp,.gallery+section>.grp{margin-top:18px}
 .journey .j-add-more .inp{flex:1 1 auto;min-width:0}
 .journey .tl .nd.ck{cursor:pointer;border:1.5px solid var(--line);background:var(--pane);display:inline-grid;place-items:center;padding:0}
 .journey .tl .nd.ck:hover{border-color:var(--accent)}
-.journey .tl li.done .nd.ck{background:var(--accent);border-color:var(--accent);color:#fff}
+.journey .tl li.done .nd.ck{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
 
 /* Project board (a project's board: lanes of cards) */
 .pb-lanes{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(168px,1fr);gap:10px;overflow-x:auto;padding-bottom:6px;scroll-snap-type:x proximity}
