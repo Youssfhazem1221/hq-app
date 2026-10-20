@@ -13,6 +13,8 @@ const AREA: [RegExp, string][] = [
   [/^board: (done|close)/i, 'closed a board post'],
   [/^board: reopen/i, 'reopened a board post'],
   [/^board\b/i, 'posted on the board'],
+  [/^ai-apply: undo\b/i, 'undid an AI change'],
+  [/^ai-apply\b/i, 'applied an AI change'],
   [/^ai: answer/i, 'answered a question'],
   [/^ai: (summarize|summary)/i, 'asked AI for a summary'],
   [/^ai\b/i, 'asked AI'],

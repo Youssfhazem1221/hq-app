@@ -48,6 +48,13 @@ export interface Source {
    * be pure. true = written (one commit on GitHub), false = nothing to change.
    */
   update(path: string, fn: UpdateFn, message: string): Promise<boolean>
+  /**
+   * An Ask AI change the person applied (any text file, code too): create, replace, or delete when `next` is null
+   * (the Undo of a file they created). Only if the file is still exactly `base` (null = it must not exist), else
+   * StaleWriteError. One commit on GitHub; `message` names the person. The house rules are checked before (lib/ai-apply)
+   * and again by the dev server in local mode.
+   */
+  apply(path: string, base: string | null, next: string | null, message: string): Promise<void>
   me(): Promise<Me>
   /** Recent commits, optionally only those touching one path (a file or a folder). */
   activity(path?: string): Promise<Commit[]>
@@ -69,8 +76,9 @@ export class LocalSource implements Source {
   kind = 'local' as const
   label = 'Local folder'
   private last = new Map<string, string>()
-  /** Text this tab itself just wrote, per path: the dev server's file event for it is not "changed on this PC". */
-  private own = new Map<string, string>()
+  /** Text this tab itself just wrote, per path (undefined = deleted): the dev server's file event for it is not
+   *  "changed on this PC". */
+  private own = new Map<string, string | undefined>()
 
   private remember(files: FileEntry[]) {
     const before = this.last
@@ -126,6 +134,17 @@ export class LocalSource implements Source {
   }
   async write(path: string, text: string) {
     await this.send(path, text)
+  }
+  /** Ask AI → Apply: `via: "ai"` makes the dev server check the shared write policy (any text file it allows). */
+  async apply(path: string, base: string | null, next: string | null) {
+    const r = await fetch('/__hq/write', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ path, via: 'ai', expect: base === null ? 'absent' : await sha1hex(base), ...(next === null ? { delete: true } : { text: next }) }),
+    })
+    if (r.status === 409) throw new StaleWriteError(`Not saved: ${path} changed since the AI read it. Ask again for a fresh change.`)
+    if (!r.ok) throw new Error(`Not saved: ${String((await r.json().catch(() => null))?.error || r.status)}`)
+    this.own.set(path, next ?? undefined)
   }
   update(path: string, fn: UpdateFn) {
     // A new file (not in the last file list): skip the first read, whose 404 the browser logs as a console error, and
@@ -259,6 +278,10 @@ export class GitHubSource implements Source {
 
   write(path: string, text: string, message: string) {
     return this.sync.write(path, text, message)
+  }
+
+  apply(path: string, base: string | null, next: string | null, message: string) {
+    return this.sync.applyFile(path, base, next, message)
   }
 
   /** Reads from the sync cache (0 extra calls); a stale cache shows up as StaleWriteError, which re-syncs it. */

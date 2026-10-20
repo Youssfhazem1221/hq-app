@@ -7,12 +7,15 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { execFile } from 'node:child_process'
 import YAML from 'yaml'
 import { DEFAULT_REPO } from './src/config'
+import { cleanPath as policyPath, isTextPath, peopleRefusal as peopleRule, projectRefusal as projectRule, readRefusal, writeRefusal } from './src/lib/write-policy'
 
 // The workspace (private data repo) is the folder above app/.
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 // The app may only write into these folders (projects/: create-only, or a project the local login owns; people/: only
-// my own files).
+// my own files). Ask AI changes the person applied (via: "ai") may go anywhere src/lib/write-policy.ts allows.
 const WRITABLE = ['board', 'todos', 'people', 'ai', 'projects']
+/** Largest file Ask AI reads here (list_files still lists bigger ones). */
+const RAW_MAX = 1_000_000
 // "Me" for reading and display when HQ_LOCAL_LOGIN is not set: the owner of the default data repo (src/config.ts).
 const DEFAULT_LOGIN = DEFAULT_REPO.split('/')[0]
 
@@ -113,56 +116,122 @@ function profileName(root: string, login: string) {
 /** sha1 (hex) of a file's text, as the app computes it for `expect` (a leading BOM is ignored). */
 export const textSha1 = (text: string) => createHash('sha1').update(noBom(String(text)), 'utf8').digest('hex')
 
-const PROJECT_FILE = /^projects\/[^/]+\/project\.md$/i
-const LEGACY_PROJECT = /^projects\/[^/]+\.md$/i
-const ownerOf = (text: string | null) => (text === null ? '' : String(frontmatter(text).owner ?? '').trim())
-const sameLogin = (a: string, b: string) => !!a && a.toLowerCase() === b.toLowerCase()
-
-/** Why the app may not write this projects/ file ('' = it may). New files are create-only (expect 'absent'): a new
- *  project.md must name me as its owner (anyone may start a project); any other new file inside projects/<slug>/
- *  needs that project to exist and be mine. Existing projects: only their owner, and never the owner line. `login` = the
- *  CONFIGURED local login: '' (HQ_LOCAL_LOGIN not set) refuses, so a clone without it never acts as the owner. */
-function projectRefusal(root: string, rel: string, cur: string | null, text: string, expect: unknown, login: string) {
-  if (!login) return 'Set HQ_LOCAL_LOGIN=<your GitHub login> in .env.local to create or change projects in local mode'
+/** The text of the project a projects/ path belongs to: its project.md, else the legacy projects/<slug>.md. */
+function projectTextOf(root: string, rel: string) {
   const slug = rel.split('/')[1].replace(/\.md$/i, '')
-  const projAbs = [`projects/${slug}/project.md`, `projects/${slug}.md`].map((r) => inside(root, r)).find((a) => a && fs.existsSync(a))
-  const projText = projAbs ? fs.readFileSync(projAbs, 'utf8') : null
-  const isProject = PROJECT_FILE.test(rel) || LEGACY_PROJECT.test(rel)
-  if (cur === null) {
-    if (expect !== 'absent') return 'New files under projects/ are create-only (expect "absent")'
-    if (projText !== null && !sameLogin(ownerOf(projText), login)) return `Only ${ownerOf(projText) || 'its owner'} can add to projects/${slug}`
-    // A new project.md: anyone may start a project (Y3), as its owner.
-    if (isProject) return sameLogin(ownerOf(text), login) ? '' : `A new project must name you (${login}) as its owner`
-    // Any other new file in a project folder (notes, "Save to project" explainers): that project's owner only.
-    if (projText === null) return `projects/${slug} has no project.md: create the project first`
-    return ''
-  }
-  const owner = isProject ? ownerOf(cur) : ownerOf(projText)
-  if (!sameLogin(owner, login)) return `Only ${owner || 'its owner'} can change this project`
-  if (isProject && ownerOf(text) !== owner) return "A project's owner can't be changed from the app"
-  return ''
+  const abs = [`projects/${slug}/project.md`, `projects/${slug}.md`].map((r) => inside(root, r)).find((a) => a && fs.existsSync(a))
+  return abs ? fs.readFileSync(abs, 'utf8') : null
 }
 
-/** Why the app may not write this people/ file ('' = it may). Only MY files: my profile people/<my slug>.md and my
- *  folder people/<my slug>/ (log, ui.md, intake), never my digest/ (the weekly digest Action writes it), never another
- *  person's, the team's or Claude's files. `login` = the CONFIGURED local login: '' (HQ_LOCAL_LOGIN not set) refuses,
- *  so a clone without it never writes check-ins, a look or a profile into the default owner's files. */
+/** Why the app may not write this projects/ file ('' = it may). New files are create-only (expect 'absent'); the
+ *  owner rules are the shared write policy's (src/lib/write-policy.ts projectRefusal): a new project.md must name me
+ *  as its owner, any other new file needs the project to exist and be mine, existing ones are the owner's, and the
+ *  owner line never changes. `login` = the CONFIGURED local login: '' (HQ_LOCAL_LOGIN not set) refuses, so a clone
+ *  without it never acts as the owner. */
+function projectRefusal(root: string, rel: string, cur: string | null, text: string, expect: unknown, login: string) {
+  if (!login) return 'Set HQ_LOCAL_LOGIN=<your GitHub login> in .env.local to create or change projects in local mode'
+  if (cur === null && expect !== 'absent') return 'New files under projects/ are create-only (expect "absent")'
+  return projectRule(rel, login, cur, text, projectTextOf(root, rel))
+}
+
+/** Why the app may not write this people/ file ('' = it may): only MY files (the shared write policy's
+ *  peopleRefusal: my profile and my folder, never my digest/, never anyone else's). `login` = the CONFIGURED local
+ *  login: '' (HQ_LOCAL_LOGIN not set) refuses, so a clone without it never writes check-ins, a look or a profile into
+ *  the default owner's files. */
 function peopleRefusal(rel: string, login: string) {
   if (!login) return 'Set HQ_LOCAL_LOGIN=<your GitHub login> in .env.local to save check-ins, your profile or your look in local mode'
-  const mine = loginSlug(login)
-  const low = rel.toLowerCase()
-  if (low === `people/${mine}.md`) return ''
-  if (low.startsWith(`people/${mine}/`) && !low.startsWith(`people/${mine}/digest/`)) return ''
-  return low.startsWith(`people/${mine}/digest/`) ? 'Digests are written by the weekly digest, not the app' : `You (${login}) can only change your own files under people/`
+  return peopleRule(rel, login)
+}
+
+/** True when `abs` (or, for a new file, its nearest existing folder) resolves outside `root` through a link. */
+function escapes(root: string, abs: string) {
+  let at = abs
+  while (!fs.existsSync(at)) {
+    const up = path.dirname(at)
+    if (up === at) return true
+    at = up
+  }
+  const real = fs.realpathSync(at)
+  const base = fs.realpathSync(root)
+  return real !== base && !real.startsWith(base + path.sep)
+}
+
+/** A workspace file for Ask AI (any file the write policy lets it read; null = none, a folder or not allowed). Over
+ *  RAW_MAX → an Error. */
+export function readRawFile(root: string, rel: string): string | null {
+  const p = policyPath(rel)
+  if (!p || readRefusal(p)) return null
+  const abs = inside(root, p)
+  if (!abs || !fs.existsSync(abs) || escapes(root, abs)) return null
+  const st = fs.statSync(abs)
+  if (!st.isFile()) return null
+  if (st.size > RAW_MAX) throw new Error(`${p} is too big to read here (${Math.round(st.size / 1000)} KB)`)
+  return fs.readFileSync(abs, 'utf8')
+}
+
+/** Every file in the workspace with its size (Ask AI's list_files), minus .git, node_modules, the app repo and what
+ *  the write policy keeps from the AI. */
+export function listAllFiles(root: string, dir = root, out: { path: string; size: number }[] = []) {
+  for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (e.name === '.git' || e.name === 'node_modules') continue
+    const abs = path.join(dir, e.name)
+    const rel = posix(path.relative(root, abs))
+    if (rel === 'app') continue
+    if (e.isDirectory()) listAllFiles(root, abs, out)
+    else if (e.isFile() && !readRefusal(rel)) out.push({ path: rel, size: fs.statSync(abs).size })
+  }
+  return out
+}
+
+/**
+ * An Ask AI change the person applied (POST /__hq/write with `via: "ai"`): any text file the shared write policy
+ * allows (notes, board, to-dos, projects you own, your own people/ files, code), as the CONFIGURED local login. Always
+ * with `expect` (sha1 of the text the change was made from, or "absent" for a new file): 409 when the file is not that
+ * version any more. `delete: true` removes the file (the Undo of a file this person created). Never dot-folders, ai/
+ * or the app.
+ */
+export function localAiWrite(root: string, body: any, login: string): { status: number; data: Record<string, unknown> } {
+  if (!login) return { status: 403, data: { error: 'Set HQ_LOCAL_LOGIN=<your GitHub login> in .env.local to apply AI changes in local mode' } }
+  const rel = cleanRel(body?.path)
+  const abs = rel ? inside(root, rel) : null
+  if (!rel || !abs || escapes(root, abs)) return { status: 400, data: { error: 'path not allowed' } }
+  const del = body.delete === true
+  if (!del && typeof body.text !== 'string') return { status: 400, data: { error: 'text must be a string' } }
+  const expect = body.expect
+  if (!(expect === 'absent' || (typeof expect === 'string' && /^[0-9a-f]{40}$/.test(expect))) || (del && expect === 'absent')) {
+    return { status: 400, data: { error: 'AI changes need expect: the sha1 of the text they were made from, or "absent"' } }
+  }
+  const cur = fs.existsSync(abs) ? fs.readFileSync(abs, 'utf8') : null
+  if (expect === 'absent' ? cur !== null : cur === null || textSha1(cur) !== expect) {
+    return { status: 409, data: { error: `${rel} changed since the AI read it`, exists: cur !== null } }
+  }
+  const next: string | null = del ? null : body.text
+  const parentId = (rel.match(/^board\/replies\/([^/]+?)--[^/]+\.md$/) || [])[1]
+  const why = writeRefusal({
+    path: rel,
+    login,
+    cur,
+    next,
+    project: rel.startsWith('projects/') ? projectTextOf(root, rel) : undefined,
+    parent: parentId ? fs.existsSync(path.join(root, 'board', `${parentId}.md`)) : undefined,
+  })
+  if (why) return { status: 403, data: { error: why } }
+  if (next === null) fs.unlinkSync(abs)
+  else {
+    fs.mkdirSync(path.dirname(abs), { recursive: true })
+    fs.writeFileSync(abs, next)
+  }
+  return { status: 200, data: { ok: true } }
 }
 
 /**
  * The app's local save (POST /__hq/write). `expect`: sha1 of the text the change was based on, or 'absent'
  * (create-only); 409 when the file is not that version any more. No `expect` = overwrite (the old behaviour).
  * projects/: see projectRefusal, people/: see peopleRefusal (403). `login` = the configured local login
- * (HQ_LOCAL_LOGIN; '' when not set).
+ * (HQ_LOCAL_LOGIN; '' when not set). `via: "ai"` = an Ask AI change the person applied: see localAiWrite.
  */
 export function localWrite(root: string, body: any, login: string = configuredLogin(path.join(root, '.env.local'))): { status: number; data: Record<string, unknown> } {
+  if (body?.via === 'ai') return localAiWrite(root, body, login)
   const rel = cleanRel(body?.path)
   const p = rel && safePath(root, rel, true)
   if (!rel || !p) return { status: 400, data: { error: 'path not allowed' } }
@@ -305,7 +374,16 @@ const sseSend = (res: any, event: string, data: unknown) => {
 }
 
 type SourceRef = { title?: string; url?: string; path?: string }
-type Done = { model?: string; seconds?: number; tools?: string[]; sources?: SourceRef[]; text?: string; key?: { kind?: string; slot?: number; borrowed?: string } | null }
+type Done = {
+  model?: string
+  seconds?: number
+  tools?: string[]
+  sources?: SourceRef[]
+  text?: string
+  key?: { kind?: string; slot?: number; borrowed?: string } | null
+  /** Ask AI's proposed changes (supabase/functions/_shared/propose.mjs), applied by the app only on the person's click */
+  proposals?: unknown[]
+}
 
 /** Answer file body: the answer + a Sources section (same shape the worker writes). */
 function answerBody(d: Done) {
@@ -371,6 +449,10 @@ async function askLocal(root: string, envFile: string, b: any, res: any, shared:
         // look settings (people/<slug>/ui.md) are app config, never AI context (readers-first gate)
         files: () => walk(root).filter((f) => !isUiPrefsPath(f.path)),
         recentChanges: (p?: string) => gitLog(root, p),
+        // every file the write policy lets the AI read (code, config, ai/ history too) + proposals the person applies
+        readRaw: async (p: string) => readRawFile(root, p),
+        listFiles: async () => listAllFiles(root),
+        writes: kind === 'ask' && !!configuredLogin(envFile),
       },
       emit,
     )
@@ -392,11 +474,16 @@ async function askLocal(root: string, envFile: string, b: any, res: any, shared:
       seconds, tools: Array.isArray(done.tools) ? done.tools : [], handled_by: 'local',
       key: done.key ? (done.key.kind === 'env' ? 'server' : `${done.key.kind}-${done.key.slot}${done.key.borrowed ? '@' + done.key.borrowed : ''}`) : undefined,
     }
+    // the proposed changes go into the answer file too (the app turns them back into Apply cards after a reload)
+    const block = path.join(shared, 'propose.mjs')
+    const changes = Array.isArray(done.proposals) && done.proposals.length && fs.existsSync(block)
+      ? (await import(pathToFileURL(block).href)).changesBlock(done.proposals)
+      : ''
     const dir = path.join(root, 'ai')
     fs.mkdirSync(path.join(dir, 'requests'), { recursive: true })
     fs.mkdirSync(path.join(dir, 'answers'), { recursive: true })
     fs.writeFileSync(path.join(dir, 'requests', `${q.id}.md`), serialize(reqData, question))
-    fs.writeFileSync(path.join(dir, 'answers', `${q.id}.md`), serialize(ansData, failure ? `⚠️ Could not answer: ${failure}` : answerBody(done)))
+    fs.writeFileSync(path.join(dir, 'answers', `${q.id}.md`), serialize(ansData, failure ? `⚠️ Could not answer: ${failure}` : answerBody(done) + changes))
   } catch (e: any) {
     failure ||= 'Could not save the answer: ' + String(e?.message || e)
   }
@@ -467,8 +554,11 @@ export function hqLocal(opts: { root?: string; envFile?: string; shared?: string
             case '/__hq/files':
               return send(res, 200, walk(root))
             case '/__hq/read': {
-              const p = safePath(root, url.searchParams.get('path') || '')
-              if (!p || !fs.existsSync(p)) return send(res, 404, { error: 'not found' })
+              // .md notes as before; other text files (code, config) that an Ask AI change may touch, for its Apply
+              const q = url.searchParams.get('path') || ''
+              const rel = cleanRel(q)
+              const p = safePath(root, q) || (rel && !readRefusal(rel) && isTextPath(rel) ? inside(root, rel) : null)
+              if (!p || !fs.existsSync(p) || !fs.statSync(p).isFile() || escapes(root, p)) return send(res, 404, { error: 'not found' })
               res.setHeader('content-type', 'text/plain; charset=utf-8')
               return res.end(fs.readFileSync(p, 'utf8'))
             }

@@ -26,6 +26,12 @@ const b64 = (s: string) => {
   new TextEncoder().encode(s).forEach((b) => (bin += String.fromCharCode(b)))
   return btoa(bin)
 }
+const fromB64 = (s: string) => {
+  const bin = atob(s.replace(/\s/g, ''))
+  const bytes = new Uint8Array(bin.length)
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+  return new TextDecoder().decode(bytes)
+}
 
 /** A save lost a race: the file changed (or was created) on GitHub after it was read. Source.update() re-reads
  *  and retries on this error; any other error stops it. */
@@ -230,6 +236,38 @@ export class RepoSync {
     if (!r.ok) throw await ghError(r)
     const j = await r.json()
     if (j.content?.sha && isMd(path) && !excluded(path)) this.files.set(path, { sha: j.content.sha, text })
+    if (j.commit?.sha) this.own.add(j.commit.sha)
+  }
+
+  /**
+   * One Ask AI change the person applied, on any text file (code too): create, replace, or delete when `next` is null
+   * (the Undo of a file they created). Only if the file is still exactly `base` (null = it must not exist), read fresh
+   * through the contents API (not the cache); else StaleWriteError. One commit, `message` names the person.
+   */
+  async applyFile(path: string, base: string | null, next: string | null, message: string) {
+    const url = `${this.base}/contents/${encPath(path)}`
+    const r = await this.api(`${url}?ref=${encodeURIComponent(this.branch)}`)
+    let cur: string | null = null
+    let sha: string | undefined
+    if (r.status !== 404) {
+      if (!r.ok) throw await ghError(r)
+      const j = await r.json()
+      if (!j || Array.isArray(j) || j.type !== 'file') throw new Error(`${path} is not a file`)
+      if (j.encoding !== 'base64' || typeof j.content !== 'string') throw new Error(`${path} is too big to change from here`)
+      cur = fromB64(j.content)
+      sha = j.sha
+    }
+    if (cur !== base) throw new StaleWriteError(`Not saved: ${path} changed since the AI read it. Ask again for a fresh change.`)
+    const send = (method: string, body: Record<string, unknown>) =>
+      this.api(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message, branch: this.branch, ...body }) })
+    const w = next === null ? await send('DELETE', { sha }) : await send('PUT', { content: b64(next), ...(sha ? { sha } : {}) })
+    if (w.status === 409 || w.status === 422) throw new StaleWriteError(`Not saved: ${path} changed on GitHub just now. Ask again for a fresh change.`)
+    if (!w.ok) throw await ghError(w)
+    const j = await w.json().catch(() => ({}))
+    if (isMd(path) && !excluded(path)) {
+      if (next === null) this.files.delete(path)
+      else if (j.content?.sha) this.files.set(path, { sha: j.content.sha, text: next })
+    }
     if (j.commit?.sha) this.own.add(j.commit.sha)
   }
 }

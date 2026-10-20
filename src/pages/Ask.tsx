@@ -2,7 +2,9 @@
 // Make it a to-do · Save to project · Copy). Composer: question · Sources · n (popover) · Fast/Deep with speed tips ·
 // send. A status line follows the stream's stages. Opening a chat scrolls to its newest question + lead, not the end.
 // Save to project = owner-only, create-only; otherwise "Post to board".
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+// Changes the AI proposes (to-dos, posts, replies, notes, code) show as a preview card with Apply / Undo under the
+// answer (components/AiChanges.tsx, lazy); only the person who asked can apply them, and nothing is saved before that.
+import { Suspense, lazy, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useHQ } from '../lib/hq-context'
 import { Icon } from '../lib/icons'
 import type { IconName, PageProps } from '../lib/contracts'
@@ -12,6 +14,7 @@ import { ASK_PREFILL_KEY, go } from '../lib/router'
 import { useIsPhone } from '../lib/bp'
 import { ago, makeId, store } from '../lib/util'
 import { ask, dropLive, historyOf, ownedProjects, saveRefusal, saveToProject, useLive, type Live } from '../lib/askStream'
+import { splitChanges, type Change } from '../lib/ai-changes'
 import { BOARD_PREFILL_KEY, answerParts, firstLine, isExplainQuestion, plainInline, type BoardPrefill } from '../lib/read-core'
 import { ASK_CHAT_KEY, AnswerView, LiveAnswer, StatusLine } from '../components/ExplainPanel'
 import { MenuItem, Popover } from '../components/shell/Popover'
@@ -31,6 +34,15 @@ const CONNECTORS: { id: Connector; label: string; hint: string; icon: IconName }
 ]
 const RECENT_MS = 15 * 60_000
 const str = (v: unknown) => (v == null ? '' : String(v))
+const AiChanges = lazy(() => import('../components/AiChanges'))
+
+/** The Apply card for an answer's proposed changes (nothing when there are none). */
+const Changes = ({ changes, mine, forName }: { changes?: Change[]; mine: boolean; forName?: string }) =>
+  changes?.length ? (
+    <Suspense fallback={null}>
+      <AiChanges changes={changes} mine={mine} forName={forName} />
+    </Suspense>
+  ) : null
 const errText = (e: unknown) => String((e as Error)?.message || e).split('\n')[0].slice(0, 160)
 
 /** A chat's title: its first question's first line. */
@@ -417,6 +429,8 @@ function SavedTurn({ r, projectTitle }: { r: Doc; projectTitle: (s?: unknown) =>
   const a = model.answers.get(id)
   const mine = str(r.data.author).toLowerCase() === me.login.toLowerCase()
   const deep = /argon|deep|pro/i.test(str(a?.data.model)) || r.data.model === 'deep'
+  // the answer text and the changes it proposed (kept in a block after its Sources)
+  const { md, changes } = useMemo(() => splitChanges(a?.body ?? ''), [a?.body])
   return (
     <div className="turn" data-turn={id}>
       <Question text={r.body} kind={r.data.kind} project={r.data.project} author={mine ? undefined : displayName(model, r.data.author)} projectTitle={projectTitle} />
@@ -424,9 +438,10 @@ function SavedTurn({ r, projectTitle }: { r: Doc; projectTitle: (s?: unknown) =>
         {a ? (
           <>
             <ModelLine deep={deep} seconds={a.data.seconds} error={a.data.status === 'error'} keyTag={a.data.key} />
-            <AnswerView md={a.body} base={a.path}>
-              <AnswerActions id={id} question={r.body} md={a.body} project={str(r.data.project) || undefined} />
+            <AnswerView md={md} base={a.path}>
+              <AnswerActions id={id} question={r.body} md={md} project={str(r.data.project) || undefined} />
             </AnswerView>
+            <Changes changes={changes} mine={mine} forName={displayName(model, r.data.author)} />
           </>
         ) : (
           <StatusLine text="Waiting for the answer" />
@@ -443,6 +458,7 @@ function LiveTurn({ l, projectTitle }: { l: Live; projectTitle: (s?: unknown) =>
       <article className="a" aria-label="Answer" aria-live="polite">
         <ModelLine deep={l.model === 'deep'} seconds={l.seconds} error={l.state === 'error'} keyTag={l.key} />
         <LiveAnswer l={l}>{l.state === 'done' && l.text ? <AnswerActions id={l.id} question={l.question} md={l.text} project={l.project} /> : null}</LiveAnswer>
+        {l.state !== 'streaming' && <Changes changes={l.changes} mine />}
       </article>
     </div>
   )

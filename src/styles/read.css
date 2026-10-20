@@ -238,3 +238,29 @@ details.dsec>.tg-body{padding:0 0 12px}
 /* Edit a page in place */
 .doc-edit{display:grid;gap:10px;margin-top:8px}
 .doc-ta{width:100%;min-height:60vh;resize:vertical;font:var(--t-sm)/1.55 var(--font-mono);padding:12px;tab-size:2}
+
+/* Ask AI changes: the preview card with Apply / Undo under an answer (components/AiChanges.tsx). */
+.aichg{margin-top:var(--s3);border:1px solid var(--line);border-radius:var(--r-sm);background:var(--pane)}
+.aichg-h{display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding:10px 12px;border-bottom:1px solid var(--line)}
+.aichg-h .hint{flex:1;min-width:14ch}
+.aichg ul{list-style:none;margin:0;padding:0}
+.aichg-row+.aichg-row{border-top:1px solid var(--line)}
+.aichg-top{display:flex;gap:10px;align-items:flex-start;padding:10px 12px}
+.aichg-ico{flex:none;margin-top:2px;color:var(--accent-ink)}
+.aichg-t{flex:1;min-width:0;display:grid;gap:4px}
+.aichg-meta{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:var(--t-xs);color:var(--muted)}
+.aichg-meta code,.aichg-meta a{overflow-wrap:anywhere}
+.aichg i{font-style:normal;font-weight:650}
+.aichg i.add{color:var(--ok-ink)}
+.aichg i.del{color:var(--bad-ink)}
+.aichg-note{display:flex;gap:6px;align-items:flex-start;font-size:var(--t-xs);color:var(--fg-2)}
+.aichg-note.warn{color:var(--warn-ink)}
+.aichg-act{display:flex;flex:none;align-items:center;gap:6px}
+.aichg-diff{padding:0 12px 10px}
+.aichg-diff>summary{cursor:pointer;font-size:var(--t-xs);font-weight:600;color:var(--fg-2)}
+.aichg pre{margin:6px 0 0;max-height:320px;overflow:auto;background:var(--pane-2);border-radius:var(--r-sm);padding:6px 0;font:var(--t-xs)/1.55 var(--font-mono)}
+.aichg .dl{display:block;padding:0 10px;white-space:pre-wrap;overflow-wrap:anywhere}
+.aichg .dl.add{background:var(--ok-wash);color:var(--ok-ink)}
+.aichg .dl.del{background:var(--bad-wash);color:var(--bad-ink)}
+.aichg .dl.hunk,.aichg .dl.more{color:var(--muted)}
+@media (max-width:560px){.aichg-top{flex-wrap:wrap}.aichg-act{width:100%}.aichg-act .btn{flex:1}}

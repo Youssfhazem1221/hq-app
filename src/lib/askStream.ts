@@ -4,6 +4,7 @@
 import { useSyncExternalStore } from 'react'
 import { AI_FUNCTION_URL } from '../config'
 import { askAi, displayName, projectSlug, type AskOptions, type Model } from './hq'
+import { changesOf, type Change } from './ai-changes'
 import { serialize } from './md'
 import { explainerPath, firstLine } from './read-core'
 import { GitHubSource, type Me, type Source } from './source'
@@ -27,6 +28,8 @@ export type Live = {
   seconds?: number
   /** the Gemini key that answered: 'free-1' | 'free-2' | 'paid-3' | 'server' (+ '@owner' when borrowed) */
   key?: string
+  /** changes the AI proposed (Apply cards under the answer; nothing is saved until the person clicks Apply) */
+  changes?: Change[]
   error?: string
   started: number
 }
@@ -154,6 +157,7 @@ async function stream(source: Source, req: AskOptions & { id: string }, history:
         if (event === 'status') patch(id, { status: String(data?.text || '') })
         else if (event === 'delta') patch(id, (l) => ({ text: l.text + String(data?.text ?? '') }))
         else if (event === 'sources') patch(id, { sources: Array.isArray(data?.items) ? data.items : [] })
+        else if (event === 'proposals') patch(id, { changes: changesOf(data?.items) })
         else if (event === 'done') {
           finished = true
           patch(id, (l) => ({
@@ -164,6 +168,7 @@ async function stream(source: Source, req: AskOptions & { id: string }, history:
             tools: Array.isArray(data?.tools) ? data.tools.map(String) : [],
             seconds: typeof data?.seconds === 'number' ? data.seconds : Math.round((Date.now() - l.started) / 1000),
             key: data?.key && typeof data.key === 'object' ? (data.key.kind === 'env' ? 'server' : `${data.key.kind}-${data.key.slot}${data.key.borrowed ? '@' + data.key.borrowed : ''}`) : undefined,
+            changes: Array.isArray(data?.proposals) ? changesOf(data.proposals) : l.changes,
             // The function answered but its commit failed: the answer lives only in this tab.
             error: data?.saved === false && !data?.dry_run ? `Not saved to GitHub${data?.saveError ? `: ${String(data.saveError).slice(0, 160)}` : ''}. Copy it if you need it.` : undefined,
           }), true)
@@ -227,12 +232,12 @@ export async function ask(source: Source, me: Me, req: AskOptions & { id: string
   }
 }
 
-/** Earlier turns of a conversation as {q, a} (answer text only, trimmed), at most 6. */
+/** Earlier turns of a conversation as {q, a} (answer text only, trimmed: no Sources, no proposed changes), at most 6. */
 export function historyOf(turns: { question: string; answer?: string }[]): HistoryTurn[] {
   return turns
     .filter((t) => t.answer && t.answer.trim())
     .slice(-MAX_HISTORY)
-    .map((t) => ({ q: t.question.trim(), a: t.answer!.split('\n---\n**Sources**')[0].trim().slice(0, HISTORY_ANSWER_CHARS) }))
+    .map((t) => ({ q: t.question.trim(), a: t.answer!.split(/\r?\n---\r?\n\*\*(?:Sources|Proposed changes)\*\*/)[0].trim().slice(0, HISTORY_ANSWER_CHARS) }))
 }
 
 /** While streaming, hide a chart or explainer block that has not closed yet (it renders once complete). */

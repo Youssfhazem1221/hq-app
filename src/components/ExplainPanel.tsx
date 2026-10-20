@@ -11,7 +11,7 @@ import { go } from '../lib/router'
 import { onEscape } from '../lib/focus'
 import { makeId, same, store } from '../lib/util'
 import { aiErrorWords, ask, liveMarkdown, useLive, type Live, type SourceRef } from '../lib/askStream'
-import { answerParts, explainQuestion, firstLine, SHOWN_BULLETS, stageText, type AnswerSource } from '../lib/read-core'
+import { answerParts, explainQuestion, firstLine, SHOWN_BULLETS, stageText, stripChanges, type AnswerSource } from '../lib/read-core'
 import type { BlockCtx } from '../lib/contracts'
 import { BLOCKS, newBlockCtx } from './blocks'
 import { Markdown, Toggle } from './ui'
@@ -95,7 +95,8 @@ type AnswerProps = {
 }
 
 /** One answer in the spec's anatomy. Answers without a lead or bullets (a greeting) render as plain markdown. */
-export function AnswerView({ md, base, liveSources, compact, children }: AnswerProps) {
+export function AnswerView({ md: raw, base, liveSources, compact, children }: AnswerProps) {
+  const md = useMemo(() => stripChanges(raw), [raw])
   const parts = useMemo(() => answerParts(md), [md])
   const ctx = newBlockCtx(base)
   const sources = parts.sources.length ? parts.sources : asSources(liveSources)

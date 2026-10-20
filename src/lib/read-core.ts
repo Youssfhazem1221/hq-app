@@ -368,8 +368,14 @@ export function parseSources(block: unknown): AnswerSource[] {
 
 /** Split an answer's markdown into the anatomy parts. Total: any text gives a result; an answer with no lead and no
  *  bullets keeps everything in `rest` (it renders as plain markdown). */
+/** An answer file's "Proposed changes" block (Ask AI changes; lib/ai-changes.ts reads it for the Apply cards). */
+const CHANGES_BLOCK = /\n[ \t]*-{3,}[ \t]*\n+[ \t]*\*\*Proposed changes\*\*[^\n]*\n+```hq-changes[ \t]*\n[^\n]*\n```[ \t]*(?:\n|$)/
+
+/** An answer without its "Proposed changes" block: the block is data for the Apply cards, never shown as text. */
+export const stripChanges = (md: unknown) => str(md).replace(/\r\n?/g, '\n').replace(CHANGES_BLOCK, '\n')
+
 export function answerParts(md: unknown): AnswerParts {
-  let text = str(md).replace(/\r\n?/g, '\n')
+  let text = stripChanges(md)
   let sources: AnswerSource[] = []
   const src = text.match(/\n-{3,}[ \t]*\n+[ \t]*\*\*Sources\*\*[^\n]*\n([\s\S]*)$/)
   if (src) {
