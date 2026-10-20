@@ -52,12 +52,13 @@ test('DOMPurify config forbids interactive, styling, embedding and media tags an
   for (const a of ['style', 'action', 'formaction', 'srcset', 'background', 'poster']) assert.ok(PURIFY.FORBID_ATTR.includes(a), `FORBID_ATTR has ${a}`)
 })
 
-test('index.html carries a CSP that blocks remote images, form posts, <base> and plugins', () => {
+test('index.html carries a CSP that blocks remote images (blob: for repo images only), form posts, <base> and plugins', () => {
   const src = fs.readFileSync(path.join(APP, 'index.html'), 'utf8')
   const m = src.match(/<meta\s+http-equiv="Content-Security-Policy"\s+content="([^"]+)"/i)
   assert.ok(m, 'CSP meta present')
   const csp = m![1]
-  assert.match(csp, /img-src 'self' data: https:\/\/avatars\.githubusercontent\.com(;|$)/)
+  // blob: = repo images the Docs reader read through the Source (components/repo-images.ts); no other image origin
+  assert.match(csp, /(^|; )img-src 'self' data: blob: https:\/\/avatars\.githubusercontent\.com(;|$)/)
   for (const d of ["form-action 'none'", "base-uri 'none'", "object-src 'none'"]) assert.ok(csp.includes(d), d)
   assert.ok(src.indexOf('Content-Security-Policy') < src.indexOf('<script'), 'CSP comes before the first script')
 })

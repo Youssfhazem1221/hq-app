@@ -477,6 +477,21 @@ export function hqLocal(opts: { root?: string; envFile?: string; shared?: string
               const r = localWrite(root, await readBody(req), configuredLogin(envFile))
               return send(res, r.status, r.data)
             }
+            case '/__hq/raw': {
+              // Docs reader images (LocalSource.readBytes): the raw bytes of a .png/.jpg/.jpeg/.webp/.gif inside the
+              // workspace, typed by its extension. Same path rules as /__hq/read (no "..", dot-folders or app/), and a
+              // link that points outside the workspace is not followed.
+              const rel = cleanRel(url.searchParams.get('path') || '')
+              const ext = rel ? /\.(png|jpe?g|webp|gif)$/i.exec(rel)?.[1].toLowerCase() : undefined
+              const p = rel && ext ? inside(root, rel) : null
+              const real = p && fs.existsSync(p) && fs.statSync(p).isFile() ? fs.realpathSync(p) : null
+              if (!real || !real.startsWith(fs.realpathSync(root) + path.sep)) return send(res, 404, { error: 'not found' })
+              if (fs.statSync(real).size > 25_000_000) return send(res, 413, { error: 'image too large' })
+              res.setHeader('content-type', 'image/' + (ext === 'jpg' ? 'jpeg' : ext))
+              res.setHeader('x-content-type-options', 'nosniff')
+              res.setHeader('cache-control', 'no-store')
+              return res.end(fs.readFileSync(real))
+            }
             case '/__hq/me': {
               // The name comes from the profile, so a wrong HQ_LOCAL_LOGIN shows before anything is saved.
               // configured: false = no HQ_LOCAL_LOGIN, so "me" is the default owner login (the UI can say so).

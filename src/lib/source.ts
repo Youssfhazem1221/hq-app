@@ -39,6 +39,8 @@ export interface Source {
   /** Cheap change check (a free 304 on GitHub). null = nothing changed since the last load. */
   refresh(): Promise<Refresh | null>
   read(path: string): Promise<string | null>
+  /** A file's raw bytes (an image a note shows in the Docs reader). null = no such file. */
+  readBytes(path: string): Promise<Blob | null>
   write(path: string, text: string, message: string): Promise<void>
   /**
    * Safe read-modify-write: `fn(current text | null)` → the new text, or null / the same text to skip. If the file
@@ -102,6 +104,13 @@ export class LocalSource implements Source {
     // an error body must never be taken for the file's text (update() would edit it)
     if (!r.ok) throw new Error(`Local dev server: could not read ${path} (${r.status})`)
     return r.text()
+  }
+  /** GET /__hq/raw: the bytes of an image inside the workspace (.png .jpg .jpeg .webp .gif only). */
+  async readBytes(path: string) {
+    const r = await fetch('/__hq/raw?path=' + encodeURIComponent(path), { cache: 'no-store' })
+    if (r.status === 404) return null
+    if (!r.ok) throw new Error(`Local dev server: could not read ${path} (${r.status})`)
+    return r.blob()
   }
   /** `expect`: sha1 of the text this change was based on, or 'absent' (create-only). The server answers 409 when
    *  the file is not that version any more. Without `expect` it overwrites (the old behaviour). */
@@ -236,6 +245,16 @@ export class GitHubSource implements Source {
     if (r.status === 404) return null
     if (!r.ok) throw new Error(`GitHub ${r.status}`)
     return r.text()
+  }
+
+  /** Bytes through the same contents API: the raw media type also serves files over 1 MB; the token stays in the header. */
+  async readBytes(path: string) {
+    const r = await this.api(`${this.repoPath}/contents/${encPath(path)}?ref=${encodeURIComponent(this.c.branch)}`, {
+      headers: { Accept: 'application/vnd.github.raw+json' },
+    })
+    if (r.status === 404) return null
+    if (!r.ok) throw new Error(`GitHub ${r.status}`)
+    return r.blob()
   }
 
   write(path: string, text: string, message: string) {

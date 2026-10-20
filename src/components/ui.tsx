@@ -222,7 +222,8 @@ export function Markdown({ md, base = '', ctx, decide }: { md: string; base?: st
 }
 
 function MarkdownText({ md, base = '' }: { md: string; base?: string }) {
-  const html = useMemo(() => toHtml(linkCitations(md)), [md])
+  // base: the note's repo images get a placeholder (only the Docs reader draws them; elsewhere they stay links)
+  const html = useMemo(() => toHtml(linkCitations(md), base), [md, base])
   const onClick = (e: React.MouseEvent) => {
     const a = (e.target as HTMLElement).closest('a')
     if (!a) return

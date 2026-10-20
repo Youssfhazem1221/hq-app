@@ -2,7 +2,8 @@
 // screens) · Open .md · auto compare from `options:` (+ ONE Decide when an open decision of mine links here) · body.
 // Long docs (≥6 `##` sections): sections after the first 3 start collapsed with a one-line summary. Sticky TOC with
 // reading progress. ✅/⚠️ State tables become a status board (the table stays one tap away); tables with 3+ columns
-// turn into cards on phones. `#/docs` alone lists every page (the sidebar Pages tree is the main way in).
+// turn into cards on phones. Images that are files in the data repo show (components/repo-images.ts). `#/docs` alone
+// lists every page (the sidebar Pages tree is the main way in).
 import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useHQ } from '../lib/hq-context'
 import { Icon } from '../lib/icons'
@@ -22,6 +23,7 @@ import { StatusBoard, statusFromText } from '../components/visuals/StatusBoard'
 import { ExplainPanel, RichMd } from '../components/ExplainPanel'
 import { Empty, Markdown, StatusPill, Toggle } from '../components/ui'
 import { toast } from '../components/toast'
+import { useRepoImages } from '../components/repo-images'
 
 export const v3 = true
 
@@ -121,6 +123,9 @@ function Reader({ doc }: { doc: Doc }) {
       setSaving(false)
     }
   }
+
+  // Images that are files in the data repo (![Props](props_flat.jpg)): read through the Source, shown from blob: URLs.
+  useRepoImages(article, source)
 
   // Wide tables (3+ columns) → cards on phones: each cell gets its column name.
   useLayoutEffect(() => {

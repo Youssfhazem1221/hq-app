@@ -6,9 +6,10 @@
     <meta name="robots" content="noindex, nofollow" />
     <meta name="color-scheme" content="light dark" />
     <!-- Defence in depth for rendered notes, posts and AI answers (lib/md-html.ts is the first layer): images only from
-         the app, data: URIs and GitHub avatars; no form posts; no <base>; no plugins. Scripts/styles are not restricted
-         here (the inline pre-paint script and the dev server's inline scripts must run). -->
-    <meta http-equiv="Content-Security-Policy" content="img-src 'self' data: https://avatars.githubusercontent.com; form-action 'none'; base-uri 'none'; object-src 'none'" />
+         the app, data: URIs, blob: URLs (repo images the Docs reader read through the Source) and GitHub avatars; no form
+         posts; no <base>; no plugins. Scripts/styles are not restricted here (the inline pre-paint script and the dev
+         server's inline scripts must run). -->
+    <meta http-equiv="Content-Security-Policy" content="img-src 'self' data: blob: https://avatars.githubusercontent.com; form-action 'none'; base-uri 'none'; object-src 'none'" />
     <title>HQ</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><rect width='24' height='24' rx='6' fill='%237c5cec'/><path d='M8 6v12M16 6v12M8 12h8' stroke='white' stroke-width='2.4' stroke-linecap='round'/></svg>" />
     <script>
