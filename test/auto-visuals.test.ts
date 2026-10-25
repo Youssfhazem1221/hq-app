@@ -265,9 +265,19 @@ function realDoc(dir: string, file: (name: string) => string, keep: (d: any) => 
   }
   return null
 }
-// The one investigation whose frontmatter lists options, and the HQ app's own project (found by content, so no
+// The investigations: in their project's folder (projects/<slug>/investigations/) since 2026-10-25, before that in
+// investigations/. Lowest number first, wherever it sits.
+function realInvestigations(): string[] {
+  const projects = path.join(ROOT, 'projects')
+  const dirs = ['investigations', ...(fs.existsSync(projects) ? fs.readdirSync(projects).map((s) => `projects/${s}/investigations`) : [])]
+  return dirs
+    .filter((d) => fs.existsSync(path.join(ROOT, d)) && fs.statSync(path.join(ROOT, d)).isDirectory())
+    .flatMap((d) => fs.readdirSync(path.join(ROOT, d)).filter((n) => n.endsWith('.md')).map((n) => `${d}/${n}`))
+    .sort((a, b) => path.basename(a).localeCompare(path.basename(b)))
+}
+// The first investigation whose frontmatter lists options, and the HQ app's own project (found by content, so no
 // private names or paths are written here).
-const money = realDoc('investigations', (n) => n, (d) => Array.isArray(d.data.options) && d.data.options.length >= 5)
+const money = realInvestigations().map((rel) => parse(rel, fs.readFileSync(path.join(ROOT, rel), 'utf8'))).find((d) => Array.isArray(d.data.options) && d.data.options.length >= 5) || null
 const hq = realDoc('projects', (n) => `${n}/project.md`, (d) => d.data.title === 'HQ dashboard')
 
 test('(B3) real options frontmatter: 5 points; #1 = fast + verified + recommended, #3 = fast + untested, #5 = slow + verified', { skip: !money && 'private workspace not available' }, () => {

@@ -24,6 +24,7 @@ import { ExplainPanel, RichMd } from '../components/ExplainPanel'
 import { Empty, Markdown, StatusPill, Toggle } from '../components/ui'
 import { toast } from '../components/toast'
 import { useRepoImages } from '../components/repo-images'
+import { movedTo } from '../lib/moved'
 
 export const v3 = true
 
@@ -36,7 +37,8 @@ export default function Docs({ route }: PageProps) {
   const { model } = useHQ()
   const path = route.doc
   if (!path) return <PagesIndex />
-  const doc = model.byPath.get(path)
+  // an old link (chat history, board posts, logs) to a page that moved: follow STRUCTURE.md's `moved:` list
+  const doc = model.byPath.get(path) || model.byPath.get(movedTo(model.byPath.get('STRUCTURE.md')?.data.moved, path))
   if (!doc)
     return (
       <div className="read-page">
