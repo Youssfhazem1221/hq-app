@@ -8,6 +8,7 @@ import { execFile } from 'node:child_process'
 import YAML from 'yaml'
 import { DEFAULT_REPO } from './src/config'
 import { cleanPath as policyPath, isTextPath, peopleRefusal as peopleRule, projectRefusal as projectRule, readRefusal, writeRefusal } from './src/lib/write-policy'
+import { UPLOAD_BYTES, uploadMax } from './src/lib/fm-edit'
 
 // The workspace (private data repo) is the folder above app/.
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
@@ -292,6 +293,35 @@ export function localTree(root: string): Promise<{ path: string; size: number }[
       resolve(list.sort((a, b) => a.path.localeCompare(b.path)))
     }),
   )
+}
+
+/** POST /__hq/upload (the app's upload and remove, phase 3): a media file into a project the local login owns.
+ *  `{path, base64}` creates (never overwrites: 409), `{path, delete: true}` removes. Media types only (UPLOAD_BYTES);
+ *  text files go through /__hq/write `via: "ai"` (the write policy). Same path rules as every other route. */
+export function localUpload(root: string, body: any, login: string): { status: number; data: Record<string, unknown> } {
+  const rel = cleanRel(body?.path)
+  const parts = rel ? rel.split('/') : []
+  const ext = rel ? /\.([a-z0-9]+)$/i.exec(rel)?.[1].toLowerCase() || '' : ''
+  if (!rel || parts[0] !== 'projects' || parts.length < 3 || !UPLOAD_BYTES.has(ext)) return { status: 400, data: { error: 'Only media files inside a project folder' } }
+  if (!login) return { status: 403, data: { error: 'Set HQ_LOCAL_LOGIN in .env.local first' } }
+  const card = inside(root, `projects/${parts[1]}/project.md`)
+  const owner = card && fs.existsSync(card) ? (fs.readFileSync(card, 'utf8').match(/^owner:\s*["']?([^"'\r\n]+)/m)?.[1] || '').trim() : ''
+  if (owner.toLowerCase() !== login.toLowerCase()) return { status: 403, data: { error: `Only ${owner || "the project's owner"} can add or remove files here` } }
+  const abs = inside(root, rel)
+  if (!abs || escapes(root, path.dirname(abs))) return { status: 400, data: { error: 'path not allowed' } }
+  if (body.delete === true) {
+    if (!fs.existsSync(abs) || !fs.statSync(abs).isFile()) return { status: 404, data: { error: 'not found' } }
+    fs.unlinkSync(abs)
+    return { status: 200, data: { ok: true } }
+  }
+  if (typeof body.base64 !== 'string' || !/^[A-Za-z0-9+/=\s]*$/.test(body.base64)) return { status: 400, data: { error: 'base64 must be a string' } }
+  if (fs.existsSync(abs)) return { status: 409, data: { error: `${rel} already exists` } }
+  const bytes = Buffer.from(body.base64, 'base64')
+  if (!bytes.length) return { status: 400, data: { error: 'empty file' } }
+  if (bytes.length > uploadMax(ext)) return { status: 413, data: { error: `too big (${Math.round(bytes.length / 1e6)} MB)` } }
+  fs.mkdirSync(path.dirname(abs), { recursive: true })
+  fs.writeFileSync(abs, bytes)
+  return { status: 200, data: { ok: true } }
 }
 
 /** /__hq/raw: the media types it serves, by extension. Never SVG or HTML: opened as a page they could run script. */
@@ -599,6 +629,12 @@ export function hqLocal(opts: { root?: string; envFile?: string; shared?: string
             case '/__hq/write': {
               if (req.method !== 'POST') return send(res, 405, { error: 'POST only' })
               const r = localWrite(root, await readBody(req), configuredLogin(envFile))
+              return send(res, r.status, r.data)
+            }
+            case '/__hq/upload': {
+              // media files into a project the local login owns (create-only) or out of it: localUpload
+              if (req.method !== 'POST') return send(res, 405, { error: 'POST only' })
+              const r = localUpload(root, await readBody(req), configuredLogin(envFile))
               return send(res, r.status, r.data)
             }
             case '/__hq/raw': {

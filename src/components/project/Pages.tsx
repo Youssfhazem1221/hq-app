@@ -6,12 +6,15 @@ import type { Doc } from '../../lib/md'
 import { Icon } from '../../lib/icons'
 import { boardConfig, pageGroups } from '../../lib/project-board'
 import { Widget } from '../ui'
+import { useFileMenu } from '../edit/file-menu'
 
 const listOf = (v: unknown): string[] => (Array.isArray(v) ? v.map((x) => String(x ?? '').trim()).filter(Boolean) : typeof v === 'string' && v.trim() ? v.split(',').map((x) => x.trim()) : [])
 
 export function ProjectPages({ p, slug }: { p: Doc; slug: string }) {
-  const { model } = useHQ()
+  const { model, me } = useHQ()
   const hub = String(p.data.hub || '')
+  // right-click a page: open, copy its path, open on GitHub; the owner can also remove it (with Undo)
+  const fm = useFileMenu(String(p.data.owner || '').toLowerCase() === String(me.login || '').toLowerCase())
   const groups = useMemo(() => {
     const paths = new Set([hub, ...listOf(p.data.docs)].filter(Boolean))
     const docs = [...(model.projectFiles.get(slug) || []), ...[...paths].map((x) => model.byPath.get(x)).filter(Boolean)] as Doc[]
@@ -39,7 +42,7 @@ export function ProjectPages({ p, slug }: { p: Doc; slug: string }) {
               </a>
             )}
             {g.rows.map((r) => (
-              <div key={r.path} className="row pg-row2">
+              <div key={r.path} className="row pg-row2" {...fm.bind(r.path)}>
                 <a className="pg-main" href={'#/docs/' + r.path} title={r.path}>
                   <Icon name="file" size="s" />
                   <span className="t sm">{r.title}</span>
@@ -55,6 +58,7 @@ export function ProjectPages({ p, slug }: { p: Doc; slug: string }) {
           </div>
         </details>
       ))}
+      {fm.menu}
     </Widget>
   )
 }

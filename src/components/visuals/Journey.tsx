@@ -9,6 +9,7 @@ import type { NextItem } from '../../lib/contracts'
 import { journeyModel, type DocLike } from '../../lib/auto-visuals'
 import { Avatar, Toggle } from '../ui'
 import { NextBar } from '../shell/NextBar'
+import { InlineDate, InlineText, useContextMenu } from '../edit/kit'
 
 type Props = {
   /** The project's project.md (a parsed Doc). */
@@ -23,14 +24,34 @@ type Props = {
   onAddMilestone?: (text: string) => Promise<unknown>
   /** Owner: tick / untick a milestone (its index in `milestones`). */
   onToggleMilestone?: (index: number, done: boolean) => Promise<unknown>
+  /** Owner: rename a milestone or set / clear its date (in place in the list, or from its right-click menu). */
+  onEditMilestone?: (index: number, patch: { text?: string; date?: string | null }) => Promise<unknown>
+  /** Owner: move a milestone up (-1) or down (+1). */
+  onMoveMilestone?: (index: number, dir: -1 | 1) => Promise<unknown>
+  /** Owner: remove a milestone. */
+  onRemoveMilestone?: (index: number) => Promise<unknown>
   className?: string
 }
 
 const sameLogin = (a: unknown, b: unknown) => String(a ?? '').toLowerCase() === String(b ?? '').toLowerCase()
 
-export function Journey({ project, next, onAct, numbersId = 'numbers', onAddMilestone, onToggleMilestone, className }: Props) {
+export function Journey({ project, next, onAct, numbersId = 'numbers', onAddMilestone, onToggleMilestone, onEditMilestone, onMoveMilestone, onRemoveMilestone, className }: Props) {
   const m = useMemo(() => journeyModel<NextItem>(project, next ?? null), [project, next])
   const hq = useHQMaybe()
+  const ctx = useContextMenu()
+  const [renaming, setRenaming] = useState<number | null>(null)
+  const last = m.milestones.length ? Math.max(...m.milestones.map((x) => x.index)) : -1
+  const rowMenu = (ms: (typeof m.milestones)[number]) => [
+    ...(onToggleMilestone ? [{ label: ms.state === 'done' ? 'Reopen' : 'Mark done', icon: ms.state === 'done' ? ('undo' as const) : ('ok' as const), run: () => void onToggleMilestone(ms.index, ms.state !== 'done') }] : []),
+    ...(onEditMilestone ? [{ label: 'Rename', icon: 'edit' as const, run: () => setRenaming(ms.index) }] : []),
+    ...(onMoveMilestone
+      ? [
+          { label: 'Move up', icon: 'up' as const, disabled: ms.index === 0, run: () => void onMoveMilestone(ms.index, -1) },
+          { label: 'Move down', icon: 'down' as const, disabled: ms.index === last, run: () => void onMoveMilestone(ms.index, 1) },
+        ]
+      : []),
+    ...(onRemoveMilestone ? [{ label: 'Remove', icon: 'x' as const, run: () => void onRemoveMilestone(ms.index) }] : []),
+  ]
   const [cur, setCur] = useState(m.focusK)
   const nodes = useRef<(HTMLButtonElement | null)[]>([])
   useEffect(() => setCur(m.focusK), [m.focusK])
@@ -170,7 +191,11 @@ export function Journey({ project, next, onAct, numbersId = 'numbers', onAddMile
         <Toggle className="jall" title={<span className="sm">All {m.total} {m.total === 1 ? 'milestone' : 'milestones'}</span>}>
           <ol className="tl">
             {m.milestones.map((ms) => (
-              <li key={ms.index} className={ms.state === 'done' ? 'done' : ms.state === 'next' ? 'next' : ''}>
+              <li
+                key={ms.index}
+                className={ms.state === 'done' ? 'done' : ms.state === 'next' ? 'next' : ''}
+                {...(onEditMilestone || onMoveMilestone || onRemoveMilestone ? ctx.bind(() => rowMenu(ms), `Milestone: ${ms.text.slice(0, 40)}`) : {})}
+              >
                 {onToggleMilestone ? (
                   <button
                     type="button"
@@ -186,15 +211,34 @@ export function Journey({ project, next, onAct, numbersId = 'numbers', onAddMile
                   <span className="nd" aria-hidden="true">{ms.state === 'done' && <Icon name="check" size="s" />}</span>
                 )}
                 <span className="tx">
-                  {ms.text}
+                  {onEditMilestone ? (
+                    <InlineText
+                      value={ms.text}
+                      label="milestone"
+                      max={140}
+                      editing={renaming === ms.index}
+                      onEditing={(on) => setRenaming(on ? ms.index : null)}
+                      onSave={(text) => onEditMilestone(ms.index, { text })}
+                    />
+                  ) : (
+                    ms.text
+                  )}
                   {ms.state !== 'later' && <span className="sr"> ({ms.state === 'done' ? 'done' : 'now'})</span>}
                 </span>
-                <span className="dt">{ms.dateLabel || (ms.state === 'next' ? 'now' : '')}</span>
+                <span className="dt">
+                  {onEditMilestone ? (
+                    <InlineDate value={ms.date || ''} label={ms.text} onSave={(date) => onEditMilestone(ms.index, { date })} />
+                  ) : (
+                    ms.dateLabel || (ms.state === 'next' ? 'now' : '')
+                  )}
+                </span>
               </li>
             ))}
           </ol>
+          {onEditMilestone && <p className="sm muted">Click a name or a date to change it. Right-click a milestone (or long-press it) to move or remove it.</p>}
         </Toggle>
       )}
+      {ctx.menu}
     </section>
   )
 }

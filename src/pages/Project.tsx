@@ -25,6 +25,9 @@ import TeamCard from '../components/people/TeamCard'
 import { ProjectBoard } from '../components/project/Board'
 import { ProjectPages } from '../components/project/Pages'
 import { ProjectFiles } from '../components/project/Files'
+import { ProjectDetails } from '../components/project/Details'
+import { useSave } from '../components/edit/kit'
+import { editMilestone, moveMilestone, removeMilestone } from '../lib/fm-edit'
 import { NextActionsProvider, useProjectNext } from '../components/NextActions'
 import { Icon } from '../lib/icons'
 import { toast } from '../components/toast'
@@ -98,6 +101,21 @@ function ProjectView({ p, slug, next }: { p: Doc; slug: string; next: ReturnType
     }
   }
   const msText = (i: number) => String(((p.data.milestones as any[]) || [])[i]?.text || '').slice(0, 40)
+  // owner: rename, date, move and remove a milestone (fm-edit: only that item's lines change; `updated` is bumped)
+  const save = useSave()
+  const [details, setDetails] = useState(false)
+  const bump = (text: string | null, cur: string) => (text === null || text === cur ? null : setTopKeys(text, { updated: new Date().toISOString().slice(0, 10) }))
+  const editMs = (index: number, patch: { text?: string; date?: string | null }) =>
+    save(
+      p.path,
+      (cur) => bump(editMilestone(cur, index, patch), cur),
+      `project: milestone ${patch.text !== undefined ? 'renamed' : 'date'} · ${msText(index)}`,
+      patch.text !== undefined ? 'Milestone renamed' : patch.date ? 'Date set' : 'Date removed',
+    ).catch((e) => toast(String(e?.message || e), 'error'))
+  const moveMs = (index: number, dir: -1 | 1) =>
+    save(p.path, (cur) => bump(moveMilestone(cur, index, dir), cur), `project: milestone moved · ${msText(index)}`, dir < 0 ? 'Moved up' : 'Moved down').catch((e) => toast(String(e?.message || e), 'error'))
+  const removeMs = (index: number) =>
+    save(p.path, (cur) => bump(removeMilestone(cur, index), cur), `project: milestone removed · ${msText(index)}`, `Removed: ${msText(index)}`).catch((e) => toast(String(e?.message || e), 'error'))
   const toggleMilestone = (index: number, done: boolean) =>
     editMilestones(
       (cur) => (done ? tickMilestone(cur, index, new Date().toISOString().slice(0, 10)) : untickMilestone(cur, index)),
@@ -155,6 +173,9 @@ function ProjectView({ p, slug, next }: { p: Doc; slug: string; next: ReturnType
         next={next}
         onAddMilestone={same(p.data.owner, me.login) ? addMilestone : undefined}
         onToggleMilestone={same(p.data.owner, me.login) ? toggleMilestone : undefined}
+        onEditMilestone={same(p.data.owner, me.login) ? editMs : undefined}
+        onMoveMilestone={same(p.data.owner, me.login) ? moveMs : undefined}
+        onRemoveMilestone={same(p.data.owner, me.login) ? removeMs : undefined}
       />
     ),
     explainers: (
@@ -173,7 +194,7 @@ function ProjectView({ p, slug, next }: { p: Doc; slug: string; next: ReturnType
   const filesRow = order.includes('files') && (
     <div className="wg pj-row">
       <div className="g12">
-        <ProjectFiles slug={slug} />
+        <ProjectFiles slug={slug} owner={same(p.data.owner, me.login)} />
       </div>
     </div>
   )
@@ -229,10 +250,17 @@ function ProjectView({ p, slug, next }: { p: Doc; slug: string; next: ReturnType
                 {isDone ? 'Reopen project' : 'Mark project done'}
               </button>
             )}
+            {owner && (
+              <button className="btn sm ghost" type="button" aria-pressed={details} onClick={() => setDetails((d) => !d)}>
+                <Icon name="edit" size="s" />
+                Edit details
+              </button>
+            )}
           </>
         }
         tiles={[openTodos.length ? { value: openTodos.length, label: openTodos.length === 1 ? 'open to-do' : 'open to-dos' } : null]}
       />
+      {owner && details && <ProjectDetails p={p} slug={slug} onClose={() => setDetails(false)} />}
       {order.map((w) => {
         if (w === 'team' || w === 'files') {
           if (teamDrawn) return null

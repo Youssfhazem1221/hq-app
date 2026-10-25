@@ -297,3 +297,8 @@ details.dsec>.tg-body{padding:0 0 12px}
 .fv-audio{width:100%}
 .fv-media-sk{width:100%;height:320px}
 .fv-frame{display:block;margin:0 auto;width:100%;border:1px solid var(--line);border-radius:var(--r);background:#fff}
+/* Editing (components/edit): click-to-edit values, note blocks, the Files card drop zone */
+.ie{all:unset;cursor:text;border-radius:4px;overflow-wrap:anywhere}.ie:hover,.blk:hover{background:var(--hover)}
+.ie:focus-visible,.blk:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.blk{border-radius:var(--r-sm);padding:2px 8px;margin:0 -8px;cursor:text}
+.dz.on{outline:2px dashed var(--accent);outline-offset:4px;border-radius:var(--r)}

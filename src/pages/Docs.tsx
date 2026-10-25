@@ -31,6 +31,8 @@ export const v3 = true
 const LazyExplainer = lazy(() => import('../components/explainers/Explainer').then((m) => ({ default: m.Explainer })))
 // every file that is not a note (JSON, TSV/CSV, images, video, audio, web pages, code): its own lazy chunk
 const LazyFileViewer = lazy(() => import('../components/files/FileViewer'))
+// the owner's Edit: the note as blocks, each edited in place (its own lazy chunk too)
+const LazyBlockEditor = lazy(() => import('../components/edit/BlockEditor'))
 
 const str = (v: unknown) => (v == null ? '' : String(v))
 const listOf = (v: unknown) => (Array.isArray(v) ? v.map(str) : typeof v === 'string' ? v.split(',') : []).map((s) => s.trim()).filter(Boolean)
@@ -102,6 +104,7 @@ function Reader({ doc }: { doc: Doc }) {
   const canEdit = !!owner && owner.toLowerCase() === String(me.login || '').toLowerCase()
   const [draft, setDraft] = useState<{ text: string; orig: string } | null>(null)
   const [saving, setSaving] = useState(false)
+  const [blockMode, setBlockMode] = useState(false)
   const startEdit = () =>
     source
       .read(doc.path)
@@ -166,6 +169,19 @@ function Reader({ doc }: { doc: Doc }) {
     <div className={'doclay' + (explain && !narrow ? ' with-x' : '') + (outline.sections.length >= 2 ? ' has-toc' : '')}>
       <article className="doc" ref={article}>
         <PageHeader icon={docIconOf(model, doc.path)} title={title(doc)} />
+        {blockMode && canEdit && !draft ? (
+          <Suspense fallback={<span className="sk" style={{ width: '100%', height: 120 }} aria-label="Opening the editor" />}>
+            <LazyBlockEditor
+              doc={doc}
+              onDone={() => setBlockMode(false)}
+              onRaw={() => {
+                setBlockMode(false)
+                void startEdit()
+              }}
+            />
+          </Suspense>
+        ) : (
+        <>
         <DocProps doc={doc} model={model} />
         <div className="doc-acts">
           <button ref={explainBtn} className="btn sm" type="button" aria-pressed={explain} aria-expanded={explain} onClick={toggleExplain}>
@@ -173,7 +189,7 @@ function Reader({ doc }: { doc: Doc }) {
             Explain this page
           </button>
           {canEdit && !draft && (
-            <button className="btn sm" type="button" onClick={() => void startEdit()}>
+            <button className="btn sm" type="button" onClick={() => setBlockMode(true)}>
               <Icon name="edit" size="s" />
               Edit
             </button>
@@ -222,6 +238,8 @@ function Reader({ doc }: { doc: Doc }) {
           })} />
         ))}
           </>
+        )}
+        </>
         )}
       </article>
       {!narrow && (panel || (outline.sections.length >= 2 && <Toc sections={outline.sections} article={article} onJump={openSection} long={outline.long} opened={opened} />))}
