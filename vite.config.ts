@@ -271,6 +271,36 @@ export function localActivity(root: string, rel?: string | null): Promise<LocalC
   )
 }
 
+/** Every file the workspace's git repo holds (tracked, plus new files .gitignore lets in) with its size: the file
+ *  viewer's index (GET /__hq/tree). Same rules as /__hq/read: no "..", dot-folders, node_modules or app/, nothing the
+ *  policy keeps from reading. A folder that is not a git repo (a test copy) is walked instead. */
+export function localTree(root: string): Promise<{ path: string; size: number }[]> {
+  const keep = (rel: string) => !!cleanRel(rel) && cleanRel(rel) === rel && !readRefusal(rel)
+  const sized = (rels: string[]) =>
+    rels.filter(keep).flatMap((rel) => {
+      try {
+        const abs = inside(root, rel)
+        const st = abs ? fs.statSync(abs) : null
+        return st && st.isFile() ? [{ path: rel, size: st.size }] : []
+      } catch {
+        return []
+      }
+    })
+  return new Promise((resolve) =>
+    execFile('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard'], { cwd: root, maxBuffer: 64 << 20 }, (err, out) => {
+      const list = err ? listAllFiles(root).filter((f) => keep(f.path)) : sized([...new Set(String(out).split('\0').filter(Boolean))])
+      resolve(list.sort((a, b) => a.path.localeCompare(b.path)))
+    }),
+  )
+}
+
+/** /__hq/raw: the media types it serves, by extension. Never SVG or HTML: opened as a page they could run script. */
+const RAW_TYPES: Record<string, string> = {
+  png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', gif: 'image/gif', avif: 'image/avif',
+  mp4: 'video/mp4', m4v: 'video/mp4', webm: 'video/webm', mov: 'video/quicktime',
+  mp3: 'audio/mpeg', wav: 'audio/wav', m4a: 'audio/mp4', ogg: 'audio/ogg', oga: 'audio/ogg', aac: 'audio/aac', flac: 'audio/flac',
+}
+
 const readBody = (req: any) =>
   new Promise<any>((resolve, reject) => {
     let d = ''
@@ -553,11 +583,15 @@ export function hqLocal(opts: { root?: string; envFile?: string; shared?: string
           switch (url.pathname) {
             case '/__hq/files':
               return send(res, 200, walk(root))
+            case '/__hq/tree':
+              // the file viewer's index: every file with its size (no contents)
+              return send(res, 200, await localTree(root))
             case '/__hq/read': {
-              // .md notes as before; other text files (code, config) that an Ask AI change may touch, for its Apply
+              // .md notes as before; other text files (code, config) that an Ask AI change may touch, for its Apply;
+              // .svg for the file viewer, which draws it inside an <img> (served as text/plain, so it never runs here)
               const q = url.searchParams.get('path') || ''
               const rel = cleanRel(q)
-              const p = safePath(root, q) || (rel && !readRefusal(rel) && isTextPath(rel) ? inside(root, rel) : null)
+              const p = safePath(root, q) || (rel && !readRefusal(rel) && (isTextPath(rel) || /\.svg$/i.test(rel)) ? inside(root, rel) : null)
               if (!p || !fs.existsSync(p) || !fs.statSync(p).isFile() || escapes(root, p)) return send(res, 404, { error: 'not found' })
               res.setHeader('content-type', 'text/plain; charset=utf-8')
               return res.end(fs.readFileSync(p, 'utf8'))
@@ -568,16 +602,17 @@ export function hqLocal(opts: { root?: string; envFile?: string; shared?: string
               return send(res, r.status, r.data)
             }
             case '/__hq/raw': {
-              // Docs reader images (LocalSource.readBytes): the raw bytes of a .png/.jpg/.jpeg/.webp/.gif inside the
-              // workspace, typed by its extension. Same path rules as /__hq/read (no "..", dot-folders or app/), and a
-              // link that points outside the workspace is not followed.
+              // Docs reader images and the file viewer's media (LocalSource.readBytes): the raw bytes of an image, video
+              // or audio file inside the workspace, typed by its extension (RAW_TYPES). Same path rules as /__hq/read
+              // (no "..", dot-folders or app/), and a link that points outside the workspace is not followed.
               const rel = cleanRel(url.searchParams.get('path') || '')
-              const ext = rel ? /\.(png|jpe?g|webp|gif)$/i.exec(rel)?.[1].toLowerCase() : undefined
-              const p = rel && ext ? inside(root, rel) : null
+              const ext = rel ? /\.([a-z0-9]+)$/i.exec(rel)?.[1].toLowerCase() : undefined
+              const type = ext && Object.prototype.hasOwnProperty.call(RAW_TYPES, ext) ? RAW_TYPES[ext] : undefined
+              const p = rel && type ? inside(root, rel) : null
               const real = p && fs.existsSync(p) && fs.statSync(p).isFile() ? fs.realpathSync(p) : null
               if (!real || !real.startsWith(fs.realpathSync(root) + path.sep)) return send(res, 404, { error: 'not found' })
-              if (fs.statSync(real).size > 25_000_000) return send(res, 413, { error: 'image too large' })
-              res.setHeader('content-type', 'image/' + (ext === 'jpg' ? 'jpeg' : ext))
+              if (fs.statSync(real).size > (type!.startsWith('image/') ? 25_000_000 : 100_000_000)) return send(res, 413, { error: 'file too large' })
+              res.setHeader('content-type', type!)
               res.setHeader('x-content-type-options', 'nosniff')
               res.setHeader('cache-control', 'no-store')
               return res.end(fs.readFileSync(real))

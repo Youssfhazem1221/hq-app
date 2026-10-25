@@ -24,6 +24,7 @@ import { GoalMeter } from '../components/visuals/GoalMeter'
 import TeamCard from '../components/people/TeamCard'
 import { ProjectBoard } from '../components/project/Board'
 import { ProjectPages } from '../components/project/Pages'
+import { ProjectFiles } from '../components/project/Files'
 import { NextActionsProvider, useProjectNext } from '../components/NextActions'
 import { Icon } from '../lib/icons'
 import { toast } from '../components/toast'
@@ -168,6 +169,14 @@ function ProjectView({ p, slug, next }: { p: Doc; slug: string; next: ReturnType
   }
   // a board or many pages: team and pages each get a full row, so the grouped pages have room
   const wide = !!boardConfig(p, slug) || (model.projectFiles.get(slug)?.length || 0) > 12
+  // data, tables, images, media and web pages of the project (not its notes): the file viewer opens them
+  const filesRow = order.includes('files') && (
+    <div className="wg pj-row">
+      <div className="g12">
+        <ProjectFiles slug={slug} />
+      </div>
+    </div>
+  )
   const teamRow = wide ? (
     <>
       {order.includes('team') && (
@@ -184,8 +193,10 @@ function ProjectView({ p, slug, next }: { p: Doc; slug: string; next: ReturnType
           </div>
         </div>
       )}
+      {filesRow}
     </>
   ) : order.includes('team') || order.includes('files') ? (
+    <>
       <div className="wg pj-row">
         {order.includes('team') && (
           <div className={(order.includes('files') ? 'g7' : 'g12') + ' secondary'}>
@@ -198,6 +209,8 @@ function ProjectView({ p, slug, next }: { p: Doc; slug: string; next: ReturnType
           </div>
         )}
       </div>
+      {filesRow}
+    </>
     ) : null
   let teamDrawn = false
 

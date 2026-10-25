@@ -29,6 +29,8 @@ import { movedTo } from '../lib/moved'
 export const v3 = true
 
 const LazyExplainer = lazy(() => import('../components/explainers/Explainer').then((m) => ({ default: m.Explainer })))
+// every file that is not a note (JSON, TSV/CSV, images, video, audio, web pages, code): its own lazy chunk
+const LazyFileViewer = lazy(() => import('../components/files/FileViewer'))
 
 const str = (v: unknown) => (v == null ? '' : String(v))
 const listOf = (v: unknown) => (Array.isArray(v) ? v.map(str) : typeof v === 'string' ? v.split(',') : []).map((s) => s.trim()).filter(Boolean)
@@ -37,6 +39,12 @@ export default function Docs({ route }: PageProps) {
   const { model } = useHQ()
   const path = route.doc
   if (!path) return <PagesIndex />
+  if (!/\.(md|markdown)$/i.test(path))
+    return (
+      <Suspense fallback={<div className="work-page" aria-busy="true"><span className="sk" style={{ width: '40%', height: 26 }} /></div>}>
+        <LazyFileViewer key={path} path={path} />
+      </Suspense>
+    )
   // an old link (chat history, board posts, logs) to a page that moved: follow STRUCTURE.md's `moved:` list
   const doc = model.byPath.get(path) || model.byPath.get(movedTo(model.byPath.get('STRUCTURE.md')?.data.moved, path))
   if (!doc)
