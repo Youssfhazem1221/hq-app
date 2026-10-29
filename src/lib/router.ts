@@ -67,7 +67,7 @@ export function pickPage(page: PageName, available: Iterable<string>): string | 
 }
 
 /** Name shown in the browser tab: "<page> · HQ". */
-export const docTitle = (label: string) => (label ? `${label} · HQ` : 'HQ')
+export const docTitle = (label: string) => (label ? `${label} · Pinwheel` : 'Pinwheel')
 
 /** Ask AI from anywhere: the Ask page reads this prefill on mount ({q, project?, auto?}). */
 export const ASK_PREFILL_KEY = 'hq.askPrefill'

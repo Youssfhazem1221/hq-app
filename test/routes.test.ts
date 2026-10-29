@@ -72,6 +72,6 @@ test('dist (when built): one chunk per page, no preview or design-lab chunk', { 
 test('askAnywhere stores the prefill the Ask page reads', () => {
   assert.equal(router.ASK_PREFILL_KEY, 'hq.askPrefill')
   assert.equal(router.BOARD_PREFILL_KEY, 'hq.boardPrefill', 'same key the Board page reads (read-core)')
-  assert.equal(router.docTitle('Projects'), 'Projects · HQ')
-  assert.equal(router.docTitle(''), 'HQ')
+  assert.equal(router.docTitle('Projects'), 'Projects · Pinwheel')
+  assert.equal(router.docTitle(''), 'Pinwheel')
 })

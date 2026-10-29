@@ -31,7 +31,7 @@ const ACCENTS: [UiPrefs['accent'], string][] = [
   ['violet', 'Violet'], ['blue', 'Blue'], ['green', 'Green'], ['amber', 'Amber'], ['rose', 'Rose'], ['slate', 'Slate'],
 ]
 const FONTS: [UiPrefs['font'], string, string][] = [
-  ['inter', 'Inter', 'Default'],
+  ['inter', 'Figtree', 'Default'],
   ['lexend', 'Lexend', 'Readable · dyslexia-friendly'],
   ['atkinson', 'Atkinson', 'Hyperlegible'],
   ['system', 'System', 'Your device'],

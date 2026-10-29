@@ -239,7 +239,7 @@ test('pre-paint: enum lists in index.html (between the markers) equal the spec �
   assert.deepEqual(JSON.parse(INDEX.slice(s + contracts.PREPAINT_ENUM_START.length, e)), SPEC_ENUM)
   assert.match(INDEX, /<meta name="color-scheme" content="light dark"/)
   const fonts = [...INDEX.matchAll(/<link[^>]+href="https:\/\/fonts\.googleapis\.com\/css2\?family=([^"&:]+)/g)].map((m) => m[1])
-  assert.deepEqual(fonts, ['Inter'], 'only Inter loads up front')
+  assert.deepEqual(fonts, ['Bricolage+Grotesque'], 'one font link up front (Bricolage Grotesque + Figtree + JetBrains Mono)')
 })
 
 test('A2 · pre-paint: cached {theme: dark, size: xl} → data-theme=dark + data-size=xl; defaults leave no attribute', () => {

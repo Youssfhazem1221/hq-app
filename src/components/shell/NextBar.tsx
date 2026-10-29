@@ -6,6 +6,7 @@ import { Icon } from '../../lib/icons'
 import { useHQMaybe, useNextActions } from '../../lib/hq-context'
 import { NEXT_BUTTON, type IconName, type NextItem, type NextKind } from '../../lib/contracts'
 import { projectSlugOf } from './shell-core'
+import { PinwheelMark } from './PinwheelMark'
 
 const KIND_ICON: Record<NextKind, IconName> = {
   help: 'question', join: 'users', decision: 'route', todo: 'tasks', milestone: 'flag', status: 'flag', checkin: 'plus',
@@ -65,6 +66,7 @@ export function NextBar({ item, variant = 'bar', then, onAct, completing, caret 
   return (
     <div className={'nextbar' + (hero ? ' hero' : '') + (busy ? ' completing' : '')} role="group" aria-label="Next step" data-next={item.id}>
       {!hero && <Icon name={KIND_ICON[item.kind] || 'arrow'} />}
+      {hero && <PinwheelMark className="nb-pw" />}
       <div className="nb-t">
         <span className="k">
           {hero && <Icon name={KIND_ICON[item.kind] || 'arrow'} size="s" />}

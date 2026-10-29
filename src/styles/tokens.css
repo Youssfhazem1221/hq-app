@@ -1,12 +1,13 @@
 /* =====================================================================
-   HQ v3 tokens · one look: "Notion x Obsidian" (calm canvas, violet ink, file-native)
+   Pinwheel tokens (HQ v4) · neon-candy look: ink + violet grounds, one tangerine pinwheel, file-native
    Layers: tokens -> base -> shell -> components -> module files (visuals, work, read, people, look)
    Breakpoints (one set, same numbers as src/lib/bp.ts): phone <= 760px · narrow <= 1100px.
    Prefs are applied ONLY as enum data-* attributes on <html> (see the end of this file).
    ===================================================================== */
 :root{
-  --font-ui:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI Variable Text","Segoe UI",system-ui,sans-serif;
-  --font-mono:ui-monospace,"Cascadia Mono","SF Mono",Menlo,Consolas,monospace;
+  --font-ui:"Figtree",-apple-system,BlinkMacSystemFont,"Segoe UI Variable Text","Segoe UI",system-ui,sans-serif;
+  --font-d:"Bricolage Grotesque","Figtree",system-ui,sans-serif;
+  --font-mono:"JetBrains Mono",ui-monospace,"Cascadia Mono",Menlo,Consolas,monospace;
   --fs:1; --lh:1.55; --ls:0em; --d:1;
   /* type scale */
   --t-xs:.75rem; --t-sm:.8125rem; --t-md:.9375rem; --t-lg:1.0625rem; --t-xl:1.25rem; --t-2xl:1.5rem; --t-3xl:2rem;
@@ -23,10 +24,12 @@
   /* light neutrals: a layered ground (cards are white on a faintly tinted canvas). --tint = the accent's hue, so the
      whole room leans toward the chosen accent (3% light · 5% dark); text stays neutral. */
   --tint:var(--accent);
-  --bg:color-mix(in oklab,#f8f8fa 97%,var(--tint)); --side:color-mix(in oklab,#f1f1f4 96%,var(--tint)); --pane:color-mix(in oklab,#f3f3f6 97%,var(--tint)); --pane-2:color-mix(in oklab,#e9e9ee 96%,var(--tint)); --raise:#ffffff; --hover:rgba(20,20,40,.045); --press:rgba(20,20,40,.075);
-  --fg:#1c1c21; --fg-2:#45464d; --muted:#62646c; --line:rgba(20,20,45,.09); --line-2:rgba(20,20,45,.16); --scrim:rgba(15,15,20,.32);
+  --bg:color-mix(in oklab,#f6f3ff 97%,var(--tint)); --side:color-mix(in oklab,#eeeafb 96%,var(--tint)); --pane:color-mix(in oklab,#efebfc 97%,var(--tint)); --pane-2:color-mix(in oklab,#e4def8 96%,var(--tint)); --raise:#ffffff; --hover:rgba(20,20,40,.045); --press:rgba(20,20,40,.075);
+  --fg:#1c1b1f; --fg-2:#45405a; --muted:#615b78; --line:rgba(28,27,31,.1); --line-2:rgba(28,27,31,.18); --scrim:rgba(15,15,20,.32);
   /* accent (violet default): fill (white text, AA) · ink (text) · wash */
-  --accent:#7c5cec; --accent-ink:#5b3fd0; --accent-wash:#efeafe; --on-accent:#ffffff;
+  --accent:#5533fc; --accent-ink:#4a26e8; --accent-wash:#e7e1ff; --on-accent:#ffffff;
+  /* the pinwheel: one tangerine moment per screen (hero button, logo) · focus ring · the neon edge */
+  --tang:#ff9a5e; --tang-ink:#b5531a; --on-tang:#1c1b1f; --focus:#4a26e8; --glow:0 0 0 1px rgba(85,51,252,.25),0 12px 32px rgba(85,51,252,.16);
   /* status (state only, always icon + word; never series colours) */
   --ok:#1f8a4c; --ok-ink:#176b3b; --ok-wash:#e3f3e9;
   --warn:#b87400; --warn-ink:#875400; --warn-wash:#fbf0da;
@@ -41,9 +44,9 @@
 }
 @media (prefers-color-scheme:dark){
   :root:not([data-theme="light"]){
-    --bg:color-mix(in oklab,#16171a 95%,var(--tint)); --side:color-mix(in oklab,#111215 95%,var(--tint)); --pane:color-mix(in oklab,#1b1c20 95%,var(--tint)); --pane-2:color-mix(in oklab,#27282e 95%,var(--tint)); --raise:color-mix(in oklab,#1e1f24 95%,var(--tint)); --hover:rgba(255,255,255,.05); --press:rgba(255,255,255,.085);
-    --fg:#e8e9ed; --fg-2:#babcc4; --muted:#9396a0; --line:rgba(255,255,255,.075); --line-2:rgba(255,255,255,.14); --scrim:rgba(0,0,0,.55);
-    --accent-ink:#ad93fb; --accent-wash:rgba(139,108,239,.18);
+    --bg:color-mix(in oklab,#141318 95%,var(--tint)); --side:color-mix(in oklab,#0f0e13 95%,var(--tint)); --pane:color-mix(in oklab,#1c1b21 95%,var(--tint)); --pane-2:color-mix(in oklab,#27252f 95%,var(--tint)); --raise:color-mix(in oklab,#211f27 95%,var(--tint)); --hover:rgba(255,255,255,.05); --press:rgba(255,255,255,.085);
+    --fg:#f6f3ff; --fg-2:#c9c3e3; --muted:#9a93b8; --line:rgba(246,243,255,.09); --line-2:rgba(246,243,255,.16); --scrim:rgba(0,0,0,.55);
+    --accent-ink:#a996ff; --accent-wash:rgba(85,51,252,.22); --tang-ink:#ff9a5e; --focus:#ff9a5e; --glow:0 0 0 1px rgba(85,51,252,.55),0 12px 40px rgba(85,51,252,.35);
     --ok:#44cf6e; --ok-ink:#6ad98a; --ok-wash:rgba(68,207,110,.13);
     --warn:#e0ac00; --warn-ink:#ebbf3c; --warn-wash:rgba(224,172,0,.14);
     --bad:#fb464c; --bad-ink:#ff7b80; --bad-wash:rgba(251,70,76,.14);
@@ -55,9 +58,9 @@
   }
 }
 :root[data-theme="dark"]{
-  --bg:color-mix(in oklab,#16171a 95%,var(--tint)); --side:color-mix(in oklab,#111215 95%,var(--tint)); --pane:color-mix(in oklab,#1b1c20 95%,var(--tint)); --pane-2:color-mix(in oklab,#27282e 95%,var(--tint)); --raise:color-mix(in oklab,#1e1f24 95%,var(--tint)); --hover:rgba(255,255,255,.05); --press:rgba(255,255,255,.085);
-  --fg:#e8e9ed; --fg-2:#babcc4; --muted:#9396a0; --line:rgba(255,255,255,.075); --line-2:rgba(255,255,255,.14); --scrim:rgba(0,0,0,.55);
-  --accent-ink:#ad93fb; --accent-wash:rgba(139,108,239,.18);
+  --bg:color-mix(in oklab,#141318 95%,var(--tint)); --side:color-mix(in oklab,#0f0e13 95%,var(--tint)); --pane:color-mix(in oklab,#1c1b21 95%,var(--tint)); --pane-2:color-mix(in oklab,#27252f 95%,var(--tint)); --raise:color-mix(in oklab,#211f27 95%,var(--tint)); --hover:rgba(255,255,255,.05); --press:rgba(255,255,255,.085);
+  --fg:#f6f3ff; --fg-2:#c9c3e3; --muted:#9a93b8; --line:rgba(246,243,255,.09); --line-2:rgba(246,243,255,.16); --scrim:rgba(0,0,0,.55);
+  --accent-ink:#a996ff; --accent-wash:rgba(85,51,252,.22); --tang-ink:#ff9a5e; --focus:#ff9a5e; --glow:0 0 0 1px rgba(85,51,252,.55),0 12px 40px rgba(85,51,252,.35);
   --ok:#44cf6e; --ok-ink:#6ad98a; --ok-wash:rgba(68,207,110,.13);
   --warn:#e0ac00; --warn-ink:#ebbf3c; --warn-wash:rgba(224,172,0,.14);
   --bad:#fb464c; --bad-ink:#ff7b80; --bad-wash:rgba(251,70,76,.14);
@@ -106,7 +109,7 @@
 :root[data-contrast="high"] :focus-visible{outline-width:3px}
 :root[data-calm="on"] .nav .badge{font-size:0;min-width:8px;width:8px;height:8px;padding:0;background:var(--muted)}
 :root[data-calm="on"] .st,:root[data-calm="on"] .chip.ok,:root[data-calm="on"] .chip.warn{background:var(--pane-2);color:var(--fg-2)}
-:root[data-calm="on"] .nextbar.hero{background:var(--raise)}
+:root[data-calm="on"] .nextbar.hero{box-shadow:var(--e1)} :root[data-calm="on"] .nb-pw{display:none}
 :root[data-focus="on"] .w[data-secondary],:root[data-focus="on"] .secondary{display:none}
 :root[data-focus="on"] .grid>*{grid-column:span 12}
 :root[data-motion="reduced"] *,:root[data-motion="reduced"] *::before,:root[data-motion="reduced"] *::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important;scroll-behavior:auto!important}

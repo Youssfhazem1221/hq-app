@@ -6,6 +6,7 @@ import { useHQMaybe, usePrefsApi } from '../../lib/hq-context'
 import { firstName, same, store } from '../../lib/util'
 import type { Route } from '../../lib/contracts'
 import { PagesTree } from './PagesTree'
+import { PinwheelMark } from './PinwheelMark'
 import { NAV, initials, navList, pinnedNow } from './shell-core'
 
 const GROUPS_KEY = 'hq.sb.groups'
@@ -46,17 +47,13 @@ export function Sidebar({ route, loggedToday, peopleBadge, onPalette, onRail, on
     : {}
   const pins = pinnedNow(prefs, model, me)
   const mySlug = model && me ? model.roster.find((p) => same(p.login, me.login))?.slug : undefined
-  const ws = me ? `${firstName(me.name)}'s HQ` : 'HQ'
+  const ws = 'pinwheel'
 
   return (
     <aside className="sb" id="sb" aria-label="Sidebar">
       <div className="sb-top">
         <a className="ws" href="#/" aria-label={`${ws}, go home`}>
-          <span className="ws-mark" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M5 4v16M19 4v16M5 12h14" />
-            </svg>
-          </span>
+          <PinwheelMark className="ws-mark" />
           <b>{ws}</b>
         </a>
         <button className="icon-btn" type="button" onClick={onRail} aria-label={`Collapse sidebar (${MOD_KEY}+\\)`} data-tipt={`Collapse sidebar · ${MOD_KEY}+\\`}>

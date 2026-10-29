@@ -1,6 +1,6 @@
-# HQ design system (v3)
+# Pinwheel design system (HQ v4)
 
-> **Answer first:** one calm "Notion × Obsidian" look. A layered canvas (lit cards on a ground faintly tinted by the accent),
+> **Answer first:** the Pinwheel look (neon candy: ink + violet grounds, one tangerine pinwheel per screen; full system in the Pinwheel design-system artifact, source in the workspace at `projects/hq-dashboard/brand/design-system/`). Underneath it is still one calm "Notion × Obsidian" layout. A layered canvas (lit cards on a ground faintly tinted by the accent),
 > violet ink, hairlines, 12 px radius, Inter.
 > Every screen leads with **one Next item with one button**, then pictures. Prefs only ever reach the page as **enum
 > `data-*` attributes** on `<html>`. Written from the built tokens in `src/styles/tokens.css` (the source of truth).
@@ -45,7 +45,7 @@
 | `--t-lg` · `--t-xl` | 17 · 20 px | lead lines · hero Next sentence, stat values |
 | `--t-2xl` · `--t-3xl` | 24 · 32 px | phone page title · page title (750, -0.025em) |
 
-- Fonts: `--font-ui` = **Inter** (the only font loaded up front). Lexend / Atkinson Hyperlegible **Next** (variable 200–800, so
+- Fonts: `--font-ui` = **Figtree**, `--font-d` = **Bricolage Grotesque** (h1, the hero sentence, stat values, the wordmark), `--font-mono` = **JetBrains Mono**: one Google Fonts link up front. The `inter` pref key is kept as the id of the default face so saved prefs stay valid. Lexend / Atkinson Hyperlegible **Next** (variable 200–800, so
   the 500–750 weights are real) load only when chosen.
   Code = the system mono stack (`--font-mono`).
 - `--fs` scales everything (`data-size` s 90% · m 100% · l 110% · xl 120% · xxl 135%); `--lh` 1.55 / 1.75 / 1.95;

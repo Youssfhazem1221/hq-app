@@ -80,7 +80,7 @@ pre.json{font:500 11.5px/1.6 var(--font-mono);background:var(--pane);border:1px 
 .fontcard.f-lexend b{font-family:"Lexend",var(--font-ui)}
 .fontcard.f-atkinson b{font-family:"Atkinson Hyperlegible",var(--font-ui)}
 .fontcard.f-system b{font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
-.fontcard.f-inter b{font-family:"Inter",system-ui,sans-serif}
+.fontcard.f-inter b{font-family:"Figtree",system-ui,sans-serif}
 
 .conn{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
 .conn-i{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 12px;border:1px solid var(--line);border-radius:var(--r-sm);font-size:var(--t-sm);min-width:0}
