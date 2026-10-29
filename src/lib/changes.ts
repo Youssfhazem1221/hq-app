@@ -35,7 +35,7 @@ const noIds = (s: string) => s.replace(/\b\d{8}-\d{6}(?:-[A-Za-z0-9]+)*\b/g, '')
 /** "Claude updated the docs" · "Alice finished “Ship it”" · "Bob: <subject>". */
 export function humanChange(c: Pick<Commit, 'message' | 'actor' | 'author'>, nameOf: (login: string) => string): string {
   const actor = String(c.actor || c.author || '')
-  const who = /^hq-ai$/i.test(actor) ? 'HQ AI' : /^hq-digest$/i.test(actor) ? 'The digest' : nameOf(actor) || 'Someone'
+  const who = /^hq-ai$/i.test(actor) ? 'Pinwheel AI' : /^hq-digest$/i.test(actor) ? 'The digest' : nameOf(actor) || 'Someone'
   // a tool prefix ("claude: board … (bridge)") says who, not what: the actor already names Claude
   const msg = String(c.message || '').replace(/\s*\[skip ci\]\s*$/i, '').replace(/^claude:\s*/i, '').trim()
   const todo = msg.match(/^todo: (done|doing|todo|reopen|undo) · (.+?)(?: → .*)?$/i)

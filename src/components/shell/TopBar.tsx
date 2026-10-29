@@ -97,7 +97,7 @@ export function TopBar(p: Props) {
         <Icon name="spark" size="s" />
         Ask
       </a>
-      <button className="tbtn" type="button" onClick={p.onAdjust} aria-label={`Adjust look (${MOD_KEY}+.)`} data-tipt={`Change how HQ looks · ${MOD_KEY}+.`}>
+      <button className="tbtn" type="button" onClick={p.onAdjust} aria-label={`Adjust look (${MOD_KEY}+.)`} data-tipt={`Change how Pinwheel looks · ${MOD_KEY}+.`}>
         <Icon name="wand" size="s" />
         <span className="hide-m">Adjust look</span>
       </button>

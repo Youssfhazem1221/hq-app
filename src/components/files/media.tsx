@@ -135,7 +135,7 @@ export function PageFrame({ source, path, html, files }: { source: Source; path:
         style={style}
       />
       <p className="sm muted fv-foot">
-        Runs sealed off: no access to HQ, no network except Google Fonts.
+        Runs sealed off: no access to Pinwheel, no network except Google Fonts.
         {pv.inlined.length > 0 && ` ${pv.inlined.length} local file${pv.inlined.length === 1 ? '' : 's'} put inline.`}
       </p>
       {(pv.missing.length > 0 || pv.skipped.length > 0) && (

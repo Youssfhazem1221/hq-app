@@ -215,7 +215,7 @@ test('Ask page: answer anatomy in order, numbered source titles, Sources · 3, F
   const order = [/class="q">How far along is demo\?/, /class="lead"/, /class="a-vis"/, /class="blist"/, /class="nextbar slim"/, /class="src"/, /class="acts"/].map(at)
   assert.ok(order.every((v) => v > 0), 'every part is there')
   assert.deepEqual([...order].sort((a, b) => a - b), order, 'question → lead → visual → bullets → Next → sources → actions')
-  assert.match(html, /HQ AI · Fast · 7 s/)
+  assert.match(html, /Pinwheel AI · Fast · 7 s/)
   assert.match(html, /<span>3 more|<span>1 more/)
   assert.match(html, /class="srcchip" href="#\/projects\/demo" data-tipt="projects\/demo\/project.md"><b>1<\/b><span>Demo app<\/span>/)
   assert.match(html, /class="srcchip" href="https:\/\/example.com\/page" target="_blank" rel="noopener noreferrer"[^>]*><b>2<\/b><span>A web page<\/span>/)

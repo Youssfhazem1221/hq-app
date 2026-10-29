@@ -230,13 +230,13 @@ function AskBar() {
     if (q.trim()) askAnywhere(q.trim())
   }
   return (
-    <section className="w flat askw" data-w="ask" aria-label="Ask HQ">
+    <section className="w flat askw" data-w="ask" aria-label="Ask Pinwheel">
       <form className="askbar" onSubmit={submit}>
         <Icon name="spark" />
         <label className="sr" htmlFor="homeask">
-          Ask HQ
+          Ask Pinwheel
         </label>
-        <input id="homeask" placeholder="Ask HQ anything…" autoComplete="off" value={q} onChange={(e) => setQ(e.target.value)} />
+        <input id="homeask" placeholder="Ask Pinwheel anything…" autoComplete="off" value={q} onChange={(e) => setQ(e.target.value)} />
         {/* primary only once there is a question: the hero Next is the screen's one primary button */}
         <button className={'btn sm' + (q.trim() ? ' primary' : '')} type="submit">
           Ask

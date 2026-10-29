@@ -33,7 +33,7 @@ test('aiErrorWords: plain words, never an HTTP code or provider jargon', () => {
   const cases: [string, RegExp][] = [
     ['Gemini 400: API key not valid. Please pass a valid API key.', /AI key isn't working/],
     ['Bad GitHub token', /sign-in has expired/],
-    ['alice is not allowed to use HQ AI', /can't use HQ AI yet/],
+    ['alice is not allowed to use HQ AI', /can't use Pinwheel AI yet/],
     ['Gemini is busy: try again in a minute', /Too many questions/],
     ['Failed to fetch', /Can't reach the AI/],
     ['Something odd', /couldn't answer/],

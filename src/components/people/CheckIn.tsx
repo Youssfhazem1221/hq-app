@@ -159,7 +159,7 @@ export default function CheckInSheet() {
           <h2 id="ci-title">
             Check in{name && <span className="ci-as"> · as {name}</span>}
           </h2>
-          <span className="chip line" data-tipt="Everyone on the team and HQ's AI can read logs">
+          <span className="chip line" data-tipt="Everyone on the team and Pinwheel's AI can read logs">
             <Icon name="eye" />
             team can see
           </span>

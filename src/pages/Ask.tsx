@@ -30,7 +30,7 @@ const CONNECTORS: { id: Connector; label: string; hint: string; icon: IconName }
   { id: 'web', label: 'The web', hint: 'Google Search, with cited sources', icon: 'globe' },
   { id: 'links', label: 'Links you paste', hint: 'Reads a link you write in the question', icon: 'link' },
   { id: 'history', label: 'Change history', hint: 'What changed, when, by whom', icon: 'history' },
-  { id: 'supabase', label: 'HQ database', hint: "Looks things up in HQ's own tables, never changes them", icon: 'db' },
+  { id: 'supabase', label: 'Pinwheel database', hint: "Looks things up in Pinwheel's own tables, never changes them", icon: 'db' },
 ]
 const RECENT_MS = 15 * 60_000
 const str = (v: unknown) => (v == null ? '' : String(v))
@@ -411,7 +411,7 @@ const ModelLine = ({ deep, seconds, error, keyTag }: { deep: boolean; seconds?: 
     <span className="av ai" aria-hidden="true">
       <Icon name="spark" />
     </span>
-    HQ AI · {deep ? 'Deep' : 'Fast'}
+    Pinwheel AI · {deep ? 'Deep' : 'Fast'}
     {seconds != null && seconds !== '' ? ` · ${seconds} s` : ''}
     <KeyChip tag={keyTag} />
     {error && (

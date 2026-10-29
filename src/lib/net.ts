@@ -4,7 +4,7 @@
 
 const KEY = 'hq.fresh'
 
-export const STALE_MSG = 'HQ was updated. Reload to get the new version.'
+export const STALE_MSG = 'Pinwheel was updated. Reload to get the new version.'
 
 /** A page file (or its CSS) that failed to load: Chrome, Firefox, Safari, Vite's CSS preload. */
 export const isStaleChunk = (e: unknown) =>

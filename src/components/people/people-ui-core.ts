@@ -384,8 +384,8 @@ export const byteLength = (s: string) => new TextEncoder().encode(String(s || ''
 export function intakePrompt(login: string, host: string | null): string {
   const who = String(login || '').trim() || '<my GitHub login>'
   const h = String(host || '').trim()
-  const first = h ? `I'm joining HQ, a shared workspace with my friend ${h}. Help me write my profile intake for it.` : `I'm setting up my profile in HQ, my shared workspace. Help me write my profile intake for it.`
-  const build = h ? `What I'd like to build with ${h}` : `What I'd like to build in HQ`
+  const first = h ? `I'm joining Pinwheel, a shared workspace with my friend ${h}. Help me write my profile intake for it.` : `I'm setting up my profile in Pinwheel, my shared workspace. Help me write my profile intake for it.`
+  const build = h ? `What I'd like to build with ${h}` : `What I'd like to build in Pinwheel`
   return [
     first,
     '',
@@ -411,7 +411,7 @@ export function intakePrompt(login: string, host: string | null): string {
     '   (3–5 topics I can help others with)',
     '   # Work style',
     '   (timezone, best hours, how I like to communicate)',
-    '   # What I want to track in my HQ log',
+    '   # What I want to track in my Pinwheel log',
     '   (pick any: done/doing/blocked · time per project · wins & learnings · energy 1-5 · other)',
     '   # How I like my screen',
     '   (e.g. dark mode, bigger text, calm colors, focus mode)',
@@ -420,7 +420,7 @@ export function intakePrompt(login: string, host: string | null): string {
     '- Facts only, from what you read. Mark guesses with (guess).',
     '- NO secrets, tokens, passwords, emails, phone numbers, addresses, client names, employer-confidential details, or other people\'s private info. Describe confidential work generically.',
     '- Max ~600 words, short bullets.',
-    '- When done, show me the file and ask me to check and edit it before I upload it to HQ.',
+    '- When done, show me the file and ask me to check and edit it before I upload it to Pinwheel.',
   ].join('\n')
 }
 

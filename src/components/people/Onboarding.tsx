@@ -145,7 +145,7 @@ export function Onboarding({ onDone, compact }: { onDone?: () => void; compact?:
     }
     // Checked before anything is written: an intake kept in HQ must not carry a key or an email (the team and AI see it).
     const bad = keepIntake && intake.trim() ? intakeProblem(intake.slice(0, INTAKE_MAX)) : null
-    if (bad) return setErr(`Not saved: line ${bad.line} of your intake ${bad.why}. Remove it, or untick "Keep my intake in HQ".`)
+    if (bad) return setErr(`Not saved: line ${bad.line} of your intake ${bad.why}. Remove it, or untick "Keep my intake in Pinwheel".`)
     setBusy(true)
     setErr('')
     try {
@@ -212,9 +212,9 @@ export function Onboarding({ onDone, compact }: { onDone?: () => void; compact?:
       <section className={'w ob' + (compact ? ' compact' : '')} aria-labelledby="ob-title">
         <div className="pp-h">
           <Icon name="ok" />
-          <h2 id="ob-title">Your profile is in HQ</h2>
+          <h2 id="ob-title">Your profile is in Pinwheel</h2>
         </div>
-        <p className="sm fg2">Teammates and HQ's AI can see it now. Projects belong to their owners: ask to join the ones you want to work on.</p>
+        <p className="sm fg2">Teammates and Pinwheel's AI can see it now. Projects belong to their owners: ask to join the ones you want to work on.</p>
         {others.length > 0 && (
           <div className="rows ob-join" role="list">
             {others.slice(0, 6).map((p) => (
@@ -241,7 +241,7 @@ export function Onboarding({ onDone, compact }: { onDone?: () => void; compact?:
       <div className="pp-h">
         <Icon name="user" />
         <h2 id="ob-title">{has ? 'Update my profile' : 'Set up my profile'}</h2>
-        <span className="chip line" data-tipt="Everything you save is visible to the team and to HQ's AI">
+        <span className="chip line" data-tipt="Everything you save is visible to the team and to Pinwheel's AI">
           <Icon name="eye" />
           visible to the team
         </span>
@@ -250,7 +250,7 @@ export function Onboarding({ onDone, compact }: { onDone?: () => void; compact?:
 
       {step === 1 && (
         <div className="ob-body">
-          <p className="ob-lead">Your own Claude reads your Claude folder and projects (read-only) and writes a short intake. HQ turns it into a profile you check.</p>
+          <p className="ob-lead">Your own Claude reads your Claude folder and projects (read-only) and writes a short intake. Pinwheel turns it into a profile you check.</p>
           <ol className="ob-guide" aria-label="What to do with the prompt">
             <li>
               <Icon name="pc" />
@@ -460,7 +460,7 @@ export function Onboarding({ onDone, compact }: { onDone?: () => void; compact?:
               <p className="sm fg2">
                 Check-ins ask: {logCfg.fields.map((f) => f.label + (f.required ? '*' : '')).join(' · ')} · kinds: {logCfg.kinds.map(kindLabel).join(', ')}
               </p>
-              {warn.length > 0 && <p className="hint warn-t">{warn.join(', ')} looks personal: the team and HQ's AI can read it.</p>}
+              {warn.length > 0 && <p className="hint warn-t">{warn.join(', ')} looks personal: the team and Pinwheel's AI can read it.</p>}
             </Card>
             {Object.keys(d.ui).length > 0 && (
               <Card title="How you like your screen" on={inc.ui} onToggle={(v) => setInc({ ...inc, ui: v })} note="Only on your devices' look; change it any time in Adjust look.">
@@ -539,11 +539,11 @@ export function Onboarding({ onDone, compact }: { onDone?: () => void; compact?:
             <label className="ob-keep">
               <input type="checkbox" checked={keepIntake} onChange={(e) => setKeepIntake(e.target.checked)} />
               <span>
-                Keep my intake in HQ <span className="hint">(visible to the team + AI)</span>
+                Keep my intake in Pinwheel <span className="hint">(visible to the team + AI)</span>
               </span>
             </label>
           )}
-          <Callout icon="eye">Everything you save here is visible to the team and to HQ's AI.</Callout>
+          <Callout icon="eye">Everything you save here is visible to the team and to Pinwheel's AI.</Callout>
           {err && (
             <p className="pp-err" role="alert">
               <Icon name="alert" size="s" /> {err}
@@ -561,7 +561,7 @@ export function Onboarding({ onDone, compact }: { onDone?: () => void; compact?:
             </button>
             <span style={{ flex: 1 }} />
             <button className="btn primary" type="button" onClick={save} disabled={busy || readOnly}>
-              {busy ? 'Saving…' : has ? 'Save my profile' : 'Save · join HQ'}
+              {busy ? 'Saving…' : has ? 'Save my profile' : 'Save · join Pinwheel'}
             </button>
           </div>
         </div>
@@ -679,9 +679,9 @@ function ProjectRow(p: { p: DraftProject; make: boolean; taken: boolean; onMake:
     <div className="ob-proj">
       <input className="inp sm" aria-label="Project name" value={p.p.name} maxLength={60} onChange={(e) => p.onChange({ ...p.p, name: e.target.value })} />
       <input className="inp sm" aria-label="One line about it" placeholder="one line" value={p.p.line} maxLength={140} onChange={(e) => p.onChange({ ...p.p, line: e.target.value })} />
-      <label className="ob-inc" data-tipt={p.taken ? 'A project with this name is already in HQ: ask its owner to join' : 'Creates projects/<name>/project.md with you as owner'}>
+      <label className="ob-inc" data-tipt={p.taken ? 'A project with this name is already in Pinwheel: ask its owner to join' : 'Creates projects/<name>/project.md with you as owner'}>
         <input type="checkbox" checked={p.make && !p.taken} disabled={p.taken || !p.p.name.trim()} onChange={(e) => p.onMake(e.target.checked)} />
-        create in HQ
+        create in Pinwheel
       </label>
       <button className="icon-btn" type="button" aria-label={`Remove ${p.p.name || 'project'}`} onClick={p.onRemove}>
         <Icon name="x" size="s" />

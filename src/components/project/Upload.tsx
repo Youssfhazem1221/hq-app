@@ -27,7 +27,7 @@ export function UploadPanel({ slug, files, existing, onClose, onDone }: { slug: 
   const problem = (it: Item, all: Item[]): string => {
     const dir = it.rel.includes('/') ? it.rel.slice(0, it.rel.lastIndexOf('/')) : ''
     const path = uploadPath(slug, it.rel.split('/').pop() || '', dir)
-    if (!path) return `HQ doesn't take .${extOf(it.file.name) || '?'} files here`
+    if (!path) return `Pinwheel doesn't take .${extOf(it.file.name) || '?'} files here`
     if (it.file.size > uploadMax(extOf(path))) return `Too big: ${humanSize(it.file.size)} (up to ${humanSize(uploadMax(extOf(path)))})`
     if (existing.has(path)) return 'A file with this name is already there: change the name'
     if (all.filter((x) => x !== it && x.rel === it.rel).length) return 'Two files would get the same name'
@@ -125,14 +125,14 @@ function useLook(file: File) {
       if (kind === 'json') {
         const s = jsonSections(JSON.parse(text))
         const recs = s.filter((x) => x.kind === 'records').reduce((a, x) => a + (x.kind === 'records' ? x.recs.rows.length : 0), 0)
-        return `${s.length} part${s.length === 1 ? '' : 's'}${recs ? ` · ${recs} rows` : ''}: HQ draws it as cards, charts and tables`
+        return `${s.length} part${s.length === 1 ? '' : 's'}${recs ? ` · ${recs} rows` : ''}: Pinwheel draws it as cards, charts and tables`
       }
       if (kind === 'table') {
         const r = delimitedRecords(parseDelimited(text, extOf(file.name)), extOf(file.name))
         return `${r.rows.length} rows · ${r.cols.map((c) => c.label).slice(0, 4).join(', ')}`
       }
     } catch {
-      return 'This file has an error: HQ will show it as text'
+      return 'This file has an error: Pinwheel will show it as text'
     }
     return text.replace(/^---[\s\S]*?\n---\s*/, '').replace(/\s+/g, ' ').slice(0, 140)
   }, [text, kind, file.name])

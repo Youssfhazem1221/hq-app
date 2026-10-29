@@ -296,7 +296,7 @@ export function aiErrorWords(raw: unknown): string {
   const s = String(raw || '').toLowerCase()
   if (/api[ _-]?key|gemini (400|403)|no gemini/.test(s)) return "The AI key isn't working · the workspace owner needs to check it"
   if (/\b401\b|github token|sign[ -]?in/.test(s)) return 'Your sign-in has expired · reconnect in Settings'
-  if (/\b403\b|not allowed/.test(s)) return "Your account can't use HQ AI yet · ask the workspace owner"
+  if (/\b403\b|not allowed/.test(s)) return "Your account can't use Pinwheel AI yet · ask the workspace owner"
   if (/\b429\b|too many|rate limit|quota|busy/.test(s)) return 'Too many questions right now · try again in a minute'
   if (/network|failed to fetch|offline|timed? ?out|took too long|did not answer|unreachable/.test(s)) return "Can't reach the AI right now · try again"
   return "The AI couldn't answer this time · try again"

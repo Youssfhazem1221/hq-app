@@ -156,7 +156,7 @@ export default function FileViewer({ path: asked }: { path: string }) {
               {project && slug ? (
                 <a href={`#/projects/${slug}`}>{String(project.data.title || slug)}</a>
               ) : (
-                <span>{crumbs[0] || 'HQ'}</span>
+                <span>{crumbs[0] || 'Pinwheel'}</span>
               )}
               {crumbs.slice(slug ? 2 : 1).map((c, i) => (
                 <span key={i}> / {c}</span>
@@ -221,7 +221,7 @@ function Body(p: {
   )
   if (p.kind === 'other')
     return (
-      <Empty icon="file" text={`HQ can't draw .${extOf(p.path) || 'this kind of'} files yet.`}>
+      <Empty icon="file" text={`Pinwheel can't draw .${extOf(p.path) || 'this kind of'} files yet.`}>
         {gh}
       </Empty>
     )

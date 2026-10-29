@@ -25,7 +25,7 @@ const SECTIONS: [string, IconName, string][] = [
   ['connection', 'plug', 'Connection'],
   ['keys', 'lock', 'AI keys'],
   ['shortcuts', 'keyboard', 'Shortcuts'],
-  ['about', 'info', 'About HQ'],
+  ['about', 'info', 'About Pinwheel'],
 ]
 const ACCENTS: [UiPrefs['accent'], string][] = [
   ['violet', 'Violet'], ['blue', 'Blue'], ['green', 'Green'], ['amber', 'Amber'], ['rose', 'Rose'], ['slate', 'Slate'],
@@ -431,12 +431,12 @@ export default function Settings({ source, onConnect }: Props) {
 
           {/* ---------------- About ---------------- */}
           <section className="set-sec" id="s-about" aria-labelledby="s-about-h">
-            <h2 id="s-about-h">About HQ</h2>
+            <h2 id="s-about-h">About Pinwheel</h2>
             <p className="fg2">Your notes live in one shared folder. The app shows them, AI answers questions about them, and Claude helps when you ask.</p>
             <div className="al-ctrl">
               <button className="btn" type="button" onClick={() => go('/docs/technical.md')}>
                 <Icon name="map" size="s" />
-                How HQ works
+                How Pinwheel works
               </button>
               <JoinGuideButton className="btn" />
             </div>

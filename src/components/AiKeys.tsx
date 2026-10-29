@@ -65,7 +65,7 @@ export function AiKeys({ source }: { source: Caller }) {
     <div className="keys">
       {err && <div className="callout bad" role="alert"><Icon name="alert" /> {err}</div>}
       {data?.uses_owner_free_keys && (
-        <div className="callout"><Icon name="info" /> No keys yet: your AI uses the HQ owner's <b>free</b> keys. Add your own below.</div>
+        <div className="callout"><Icon name="info" /> No keys yet: your AI uses the Pinwheel owner's <b>free</b> keys. Add your own below.</div>
       )}
 
       {/* paid spend vs cap: the one number that costs money */}

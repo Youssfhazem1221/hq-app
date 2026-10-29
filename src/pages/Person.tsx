@@ -64,7 +64,7 @@ function PersonPage({ slug }: { slug: string }) {
     return (
       <div className="pp person-page">
         <PageHeader icon="users" title="Not found" />
-        <Empty icon="users" text={`No one called "${slug}" is in HQ yet.`}>
+        <Empty icon="users" text={`No one called "${slug}" is in Pinwheel yet.`}>
           <a className="btn sm" href="#/people">
             Back to People
           </a>
@@ -135,7 +135,7 @@ function PersonView({ login, isMe, model, me }: { login: string; isMe: boolean; 
         icon="learned"
         menu={menuFor('log')}
         act={
-          <span className="chip line" data-tipt="Everyone on the team and HQ's AI can read logs">
+          <span className="chip line" data-tipt="Everyone on the team and Pinwheel's AI can read logs">
             <Icon name="eye" />
             team can see
           </span>

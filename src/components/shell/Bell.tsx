@@ -104,12 +104,12 @@ export default function Bell() {
     setRing((k) => k + 1)
     if (!popRef.current || document.visibilityState !== 'hidden') return
     if (fresh.length > POPUP_MAX) {
-      show(`HQ · ${fresh.length} new on the board`, fresh.slice(0, POPUP_MAX).map((n) => noteWords(n, nameOf).line).join('\n'), 'hq-board', () => (location.hash = '/board'))
+      show(`Pinwheel · ${fresh.length} new on the board`, fresh.slice(0, POPUP_MAX).map((n) => noteWords(n, nameOf).line).join('\n'), 'hq-board', () => (location.hash = '/board'))
       return
     }
     for (const n of fresh) {
       const body = noteWords(n, nameOf).line + (n.snippet ? `\n“${n.snippet}”` : '')
-      show(`HQ · ${POPUP_TITLE[n.kind]}`, body, 'hq-' + n.hashes[0], () => {
+      show(`Pinwheel · ${POPUP_TITLE[n.kind]}`, body, 'hq-' + n.hashes[0], () => {
         markOne(n)
         location.hash = noteHref(n).slice(1)
       })
@@ -139,7 +139,7 @@ export default function Bell() {
     }
     setPermission(p)
     if (p !== 'granted') return toast(p === 'denied' ? 'Pop-ups are blocked for this site in your browser settings' : 'Pop-ups stay off', 'info')
-    if (!show('HQ pop-ups are on', 'New posts, replies and closes show up like this while HQ is in another tab.', 'hq-popups-on', () => {})) {
+    if (!show('Pinwheel pop-ups are on', 'New posts, replies and closes show up like this while Pinwheel is in another tab.', 'hq-popups-on', () => {})) {
       setPermission('unsupported')
       return toast('This browser has no pop-ups for a tab. The bell still collects everything.', 'info')
     }
@@ -216,7 +216,7 @@ export default function Bell() {
         )}
         {permission === 'granted' || permission === 'default' ? (
           <div className="nb-f">
-            <span id="nb-pl">Pop-ups while HQ is in another tab</span>
+            <span id="nb-pl">Pop-ups while Pinwheel is in another tab</span>
             <button className="sw" type="button" role="switch" aria-checked={popups} aria-labelledby="nb-pl" onClick={() => void togglePopups(!popups)} />
           </div>
         ) : (

@@ -151,13 +151,13 @@ test('rows: own rows editable for 7 days; days newest first; row time', () => {
 
 test('onboarding prompt: the login is filled in, the host name comes from data, the rules are there', () => {
   const p = ui.intakePrompt('sam-dev', 'Sam')
-  assert.ok(p.startsWith("I'm joining HQ, a shared workspace with my friend Sam. Help me write my profile intake for it.\n"))
+  assert.ok(p.startsWith("I'm joining Pinwheel, a shared workspace with my friend Sam. Help me write my profile intake for it.\n"))
   assert.ok(p.includes('2. Write ONE file, hq-intake-sam-dev.md, in my home folder, using this template:'))
   assert.ok(p.includes("   # What I'd like to build with Sam"))
   for (const s of ['Never open .credentials.json', 'Use `git log` for counts and dates only.', '- Max ~600 words, short bullets.', '(guess)', '# How I like my screen'])
     assert.ok(p.includes(s), s)
   const host = ui.intakePrompt('sam-dev', null)
-  assert.ok(host.startsWith("I'm setting up my profile in HQ, my shared workspace."))
+  assert.ok(host.startsWith("I'm setting up my profile in Pinwheel, my shared workspace."))
   assert.ok(!host.includes('my friend'))
   assert.equal(ui.byteLength('é'), 2)
   assert.equal(ui.INTAKE_MAX, 20000)

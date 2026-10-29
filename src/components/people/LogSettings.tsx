@@ -81,7 +81,7 @@ export function LogSettings({ onDone }: { onDone?: () => void }) {
       <div className="pp-h">
         <Icon name="gear" />
         <h2 id="ls-title">My logging</h2>
-        <span className="chip line" data-tipt="Everything here is visible to the team and to HQ's AI">
+        <span className="chip line" data-tipt="Everything here is visible to the team and to Pinwheel's AI">
           <Icon name="eye" />
           visible to the team
         </span>
@@ -276,7 +276,7 @@ export function LogSettings({ onDone }: { onDone?: () => void }) {
 
       {warn.length > 0 && (
         <Callout icon="eye">
-          <b>{warn.join(', ')}</b> looks personal. Everyone on the team and HQ's AI can read it. Keep it only if you're fine with that.
+          <b>{warn.join(', ')}</b> looks personal. Everyone on the team and Pinwheel's AI can read it. Keep it only if you're fine with that.
         </Callout>
       )}
       {(errors.length > 0 || check.errors.length > 0) && (
