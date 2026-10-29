@@ -5,11 +5,20 @@ import {
   Database, Ellipsis, ExternalLink, Eye, EyeOff, File as FileIcon, Flag, Focus, Folder, GitCommitHorizontal, Globe, GripVertical,
   HardDrive, History as HistoryIcon, House, Inbox, Info, Keyboard, Layers, LayoutGrid, LayoutPanelLeft, Leaf, Lightbulb,
   Link as LinkIcon, List, LoaderCircle, Lock, LogOut, Map as MapIcon, MapPin, Megaphone, Menu, MessageCircle, MessageSquare, Monitor,
-  OctagonMinus, PanelLeft, Pause, Pencil, Pin, Play, Plug, Plus, RefreshCw, Route, Search, Send, Settings, SlidersHorizontal, Sparkle,
+  OctagonMinus, PanelLeft, Pause, Pencil, Pin, Play, Plug, Plus, RefreshCw, Route, Search, Send, Settings, SlidersHorizontal,
   SquareCheck, SquareKanban, Star, Sun, Moon, Table2, Target, TriangleAlert, Trophy, Type, Undo2, User, Users, WandSparkles,
   Webhook, X, Zap, type LucideIcon,
 } from 'lucide-react'
 import type { IconName } from './contracts'
+
+/** The Pinwheel mark (8-blade peppermint pinwheel, 120 box). It stands in for the AI everywhere ('spark'). */
+export const PW_PATH =
+  'M60 60Q35.01 40.17 60.00 2.00A58 58 0 0 1 84.28 7.33Q49.01 38.26 60 60ZM60 60Q56.35 28.31 101.01 18.99A58 58 0 0 1 114.42 39.93Q67.60 36.86 60 60ZM60 60Q79.83 35.01 118.00 60.00A58 58 0 0 1 112.67 84.28Q81.74 49.01 60 60ZM60 60Q91.69 56.35 101.01 101.01A58 58 0 0 1 80.07 114.42Q83.14 67.60 60 60ZM60 60Q84.99 79.83 60.00 118.00A58 58 0 0 1 35.72 112.67Q70.99 81.74 60 60ZM60 60Q63.65 91.69 18.99 101.01A58 58 0 0 1 5.58 80.07Q52.40 83.14 60 60ZM60 60Q40.17 84.99 2.00 60.00A58 58 0 0 1 7.33 35.72Q38.26 70.99 60 60ZM60 60Q28.31 63.65 18.99 18.99A58 58 0 0 1 39.93 5.58Q36.86 52.40 60 60Z'
+const Pinwheel = (({ className, ...p }: { className?: string }) => (
+  <svg viewBox="0 0 120 120" className={(className || '') + ' pw'} {...p}>
+    <path d={PW_PATH} />
+  </svg>
+)) as unknown as LucideIcon
 
 export const ICONS: Record<string, LucideIcon> = {
   // app
@@ -23,7 +32,7 @@ export const ICONS: Record<string, LucideIcon> = {
   alert: TriangleAlert, ok: CircleCheckBig, send: Send, logout: LogOut, loader: LoaderCircle, star: Star, target: Target,
   question: CircleHelp, edit: Pencil,
   // explainer enums
-  flag: Flag, route: Route, chart: ChartColumn, users: Users, arrow: ArrowRight, spark: Sparkle, file: FileIcon, folder: Folder,
+  flag: Flag, route: Route, chart: ChartColumn, users: Users, arrow: ArrowRight, spark: Pinwheel, file: FileIcon, folder: Folder,
   db: Database, bell: Bell, pc: Monitor, repo: BookMarked, globe: Globe, lock: Lock, check: Check, clock: Clock, idea: Lightbulb,
   layers: Layers, map: MapIcon, pin: MapPin, coins: Coins, briefcase: Briefcase, layout: LayoutPanelLeft, user: User, bot: Bot,
   zap: Zap, win: Trophy, learned: BookOpen, blocked: OctagonMinus, pinned: Pin,

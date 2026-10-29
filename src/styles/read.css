@@ -157,7 +157,7 @@ details.dsec>.tg-body{padding:0 0 12px}
 .thr-list{display:grid;gap:2px;overflow:auto;align-content:start;min-height:0}
 .thr{display:grid;gap:2px;text-align:left;border:0;background:none;padding:8px 10px;border-radius:8px;min-width:0;color:var(--fg)}
 .thr:hover{background:var(--hover)}
-.thr[aria-current="true"]{background:var(--raise);box-shadow:var(--e1)}
+.thr[aria-current="true"]{background:var(--accent-wash)}
 .thr b{font-size:var(--t-sm);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .thr span{font-size:var(--t-xs);color:var(--muted)}
 .thr-list .pad{padding:8px 10px}
@@ -171,15 +171,16 @@ details.dsec>.tg-body{padding:0 0 12px}
 .ask .q{max-width:min(560px,85%);background:var(--accent-wash);color:var(--fg);padding:9px 14px;border-radius:14px 14px 4px 14px;font-weight:550;white-space:pre-wrap;overflow-wrap:anywhere}
 .ask .a{display:grid;gap:12px;max-width:760px;min-width:0}
 .ask .a-h{display:flex;align-items:center;gap:8px;font-size:var(--t-xs);color:var(--muted);font-weight:600}
-.av.ai{width:26px;height:26px;border:0;background:var(--accent);color:var(--on-accent)}
-.av.ai .i{width:14px;height:14px}
+.av.ai{width:26px;height:26px;border:0;background:var(--accent)}
+.av.ai .i{width:16px;height:16px}
+.av.ai.busy .i{animation:spin .9s linear infinite}
 .ask-empty{display:grid;justify-items:center;gap:10px;text-align:center;padding:48px 8px 24px}
-.ask-empty h2{font-size:var(--t-xl);font-weight:700;margin:0}
+.ask-empty h2{font:750 var(--t-3xl)/1.1 var(--font-d);letter-spacing:-.03em}
 .ask-empty .chips{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;max-width:560px}
-.ae-ico{width:48px;height:48px;border-radius:14px;display:grid;place-items:center;background:var(--accent-wash);color:var(--accent-ink)}
+.ae-ico svg.i.l{width:64px;height:64px}
 .composer{border-top:1px solid var(--line);padding:12px 16px 14px;background:var(--raise)}
 .comp-box{border:1px solid var(--line-2);border-radius:14px;padding:8px 8px 8px 12px;display:grid;gap:8px;background:var(--raise)}
-.comp-box:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 18%,transparent)}
+.comp-box:focus-within{border-color:transparent;box-shadow:var(--glow)}
 .comp-box textarea{border:0;background:none;outline:none;resize:none;min-height:24px;max-height:160px;font:inherit;font-size:var(--t-md);line-height:1.5;color:var(--fg);width:100%}
 .comp-box textarea::placeholder{color:var(--muted)}
 .comp-proj{display:flex;align-items:center;gap:6px}

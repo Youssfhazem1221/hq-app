@@ -324,7 +324,7 @@ export default function Ask(_: PageProps) {
                   </button>
                 </div>
                 <button className="send" type="submit" aria-label="Send" disabled={busy || !q.trim()}>
-                  <Icon name={busy ? 'loader' : 'up'} className={busy ? 'spin' : undefined} />
+                  <Icon name={busy ? 'spark' : 'up'} className={busy ? 'spin' : undefined} />
                 </button>
               </div>
             </div>
@@ -406,9 +406,9 @@ function KeyChip({ tag }: { tag?: unknown }) {
   )
 }
 
-const ModelLine = ({ deep, seconds, error, keyTag }: { deep: boolean; seconds?: unknown; error?: boolean; keyTag?: unknown }) => (
+const ModelLine = ({ deep, seconds, error, keyTag, busy }: { deep: boolean; seconds?: unknown; error?: boolean; keyTag?: unknown; busy?: boolean }) => (
   <div className="a-h">
-    <span className="av ai" aria-hidden="true">
+    <span className={'av ai' + (busy ? ' busy' : '')} aria-hidden="true">
       <Icon name="spark" />
     </span>
     Pinwheel AI · {deep ? 'Deep' : 'Fast'}
@@ -456,7 +456,7 @@ function LiveTurn({ l, projectTitle }: { l: Live; projectTitle: (s?: unknown) =>
     <div className="turn" data-turn={l.id}>
       <Question text={l.question} project={l.project} projectTitle={projectTitle} />
       <article className="a" aria-label="Answer" aria-live="polite">
-        <ModelLine deep={l.model === 'deep'} seconds={l.seconds} error={l.state === 'error'} keyTag={l.key} />
+        <ModelLine deep={l.model === 'deep'} seconds={l.seconds} error={l.state === 'error'} keyTag={l.key} busy={l.state === 'streaming'} />
         <LiveAnswer l={l}>{l.state === 'done' && l.text ? <AnswerActions id={l.id} question={l.question} md={l.text} project={l.project} /> : null}</LiveAnswer>
         {l.state !== 'streaming' && <Changes changes={l.changes} mine />}
       </article>

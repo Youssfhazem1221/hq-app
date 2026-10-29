@@ -22,7 +22,7 @@ code{background:var(--pane-2);padding:1px 5px;border-radius:5px}
 .sr{position:absolute!important;left:0;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;margin:-1px;padding:0;border:0}
 .muted{color:var(--muted)} .fg2{color:var(--fg-2)} .sm{font-size:var(--t-sm)} .xs{font-size:var(--t-xs)}
 svg.i{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-svg.i.s,svg.i.sm{width:15px;height:15px} svg.i.l,svg.i.lg{width:22px;height:22px} svg.i.f{fill:currentColor;stroke:none}
+svg.i.s,svg.i.sm{width:15px;height:15px} svg.i.l,svg.i.lg{width:22px;height:22px} svg.i.f{fill:currentColor;stroke:none} svg.pw{fill:var(--tang);stroke:none}
 .i-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:currentColor;opacity:.5;flex:none;margin:0 6px}
 .skip{position:absolute;left:8px;top:-60px;z-index:100;background:var(--accent);color:var(--on-accent);padding:8px 12px;border-radius:8px;font-weight:600}
 .skip:focus{top:8px}

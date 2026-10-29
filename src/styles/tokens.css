@@ -42,21 +42,6 @@
   --mark-empty:#85858a; --mark-ctx:#85858a;
   color-scheme:light;
 }
-@media (prefers-color-scheme:dark){
-  :root:not([data-theme="light"]){
-    --bg:color-mix(in oklab,#141318 95%,var(--tint)); --side:color-mix(in oklab,#0f0e13 95%,var(--tint)); --pane:color-mix(in oklab,#1c1b21 95%,var(--tint)); --pane-2:color-mix(in oklab,#27252f 95%,var(--tint)); --raise:color-mix(in oklab,#211f27 95%,var(--tint)); --hover:rgba(255,255,255,.05); --press:rgba(255,255,255,.085);
-    --fg:#f6f3ff; --fg-2:#c9c3e3; --muted:#9a93b8; --line:rgba(246,243,255,.09); --line-2:rgba(246,243,255,.16); --scrim:rgba(0,0,0,.55);
-    --accent-ink:#a996ff; --accent-wash:rgba(85,51,252,.22); --tang-ink:#ff9a5e; --focus:#ff9a5e; --glow:0 0 0 1px rgba(85,51,252,.55),0 12px 40px rgba(85,51,252,.35);
-    --ok:#44cf6e; --ok-ink:#6ad98a; --ok-wash:rgba(68,207,110,.13);
-    --warn:#e0ac00; --warn-ink:#ebbf3c; --warn-wash:rgba(224,172,0,.14);
-    --bad:#fb464c; --bad-ink:#ff7b80; --bad-wash:rgba(251,70,76,.14);
-    --viz-1:#3987e5; --viz-2:#d95926; --viz-3:#199e70; --viz-4:#c98500; --viz-5:#d55181; --viz-6:#008300; --viz-7:#9085e9; --viz-8:#e66767;
-    --seq-1:#184f95; --seq-2:#256abf; --seq-3:#3987e5; --seq-4:#6da7ec; --seq-5:#b7d3f6;
-    --grid:#303030; --axis:#4a4a4a; --mark-empty:#7a7a7a; --mark-ctx:#7a7a7a;
-    --e1:inset 0 1px 0 rgba(255,255,255,.04),0 1px 2px rgba(0,0,0,.35); --e2:inset 0 1px 0 rgba(255,255,255,.05),0 1px 2px rgba(0,0,0,.4),0 12px 32px rgba(0,0,0,.45); --e3:inset 0 1px 0 rgba(255,255,255,.06),0 2px 8px rgba(0,0,0,.5),0 24px 64px rgba(0,0,0,.6);
-    color-scheme:dark;
-  }
-}
 :root[data-theme="dark"]{
   --bg:color-mix(in oklab,#141318 95%,var(--tint)); --side:color-mix(in oklab,#0f0e13 95%,var(--tint)); --pane:color-mix(in oklab,#1c1b21 95%,var(--tint)); --pane-2:color-mix(in oklab,#27252f 95%,var(--tint)); --raise:color-mix(in oklab,#211f27 95%,var(--tint)); --hover:rgba(255,255,255,.05); --press:rgba(255,255,255,.085);
   --fg:#f6f3ff; --fg-2:#c9c3e3; --muted:#9a93b8; --line:rgba(246,243,255,.09); --line-2:rgba(246,243,255,.16); --scrim:rgba(0,0,0,.55);
@@ -77,13 +62,6 @@
 :root[data-accent="amber"]{--accent:#b45f06;--accent-ink:#8a4a04;--accent-wash:#fbefe0}
 :root[data-accent="rose"]{--accent:#d1386e;--accent-ink:#a82a55;--accent-wash:#fce8ef}
 :root[data-accent="slate"]{--accent:#5b6475;--accent-ink:#434b59;--accent-wash:#eceef2}
-@media (prefers-color-scheme:dark){
-  :root:not([data-theme="light"])[data-accent="blue"]{--accent-ink:#8fb6f5;--accent-wash:rgba(47,111,219,.2)}
-  :root:not([data-theme="light"])[data-accent="green"]{--accent-ink:#6ad98a;--accent-wash:rgba(27,125,68,.24)}
-  :root:not([data-theme="light"])[data-accent="amber"]{--accent-ink:#f0b45a;--accent-wash:rgba(180,95,6,.24)}
-  :root:not([data-theme="light"])[data-accent="rose"]{--accent-ink:#f39abb;--accent-wash:rgba(209,56,110,.22)}
-  :root:not([data-theme="light"])[data-accent="slate"]{--accent:#dfe3ea;--on-accent:#16181c;--accent-ink:#c9cfda;--accent-wash:rgba(160,170,190,.15);--tint:#5b6475}
-}
 :root[data-theme="dark"][data-accent="blue"]{--accent-ink:#8fb6f5;--accent-wash:rgba(47,111,219,.2)}
 :root[data-theme="dark"][data-accent="green"]{--accent-ink:#6ad98a;--accent-wash:rgba(27,125,68,.24)}
 :root[data-theme="dark"][data-accent="amber"]{--accent-ink:#f0b45a;--accent-wash:rgba(180,95,6,.24)}
@@ -113,6 +91,7 @@
 :root[data-focus="on"] .w[data-secondary],:root[data-focus="on"] .secondary{display:none}
 :root[data-focus="on"] .grid>*{grid-column:span 12}
 :root[data-motion="reduced"] *,:root[data-motion="reduced"] *::before,:root[data-motion="reduced"] *::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important;scroll-behavior:auto!important}
+/* dark = :root[data-theme="dark"] only: the pre-paint script and prefs.applyRoot always set data-theme */
 @media (prefers-reduced-motion:reduce){
   :root:not([data-motion="full"]) *,:root:not([data-motion="full"]) *::before,:root:not([data-motion="full"]) *::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important;scroll-behavior:auto!important}
 }
